@@ -101,11 +101,11 @@ class ParseLineTestCase(unittest.TestCase):
         self.assertIsNone(request)
 
 
-class ParseLogFileTestCase(unittest.TestCase):
+class ExtractInfoFromFileTestCase(unittest.TestCase):
     def test_plain(self):
         log_file = la.LogFile(pathlib.Path('log/test_log'), date(2019, 1, 1), ext='')
         error_percent = 10
-        requests = la.parse_log_file(log_file, error_percent)
+        requests = la.extract_info_from_file(log_file, error_percent)
         self.assertEqual(requests, {
             'GET /api/v2/banner/25019354 HTTP/1.1': [0.39],
             'GET /api/1/photogenic_banners/list/?server_name=WIN7RB4 HTTP/1.1': [0.133],
@@ -117,7 +117,7 @@ class ParseLogFileTestCase(unittest.TestCase):
     def test_zip(self):
         log_file = la.LogFile(pathlib.Path('log/test_log.gz'), date(2019, 1, 1), ext='.gz')
         error_percent = 10
-        requests = la.parse_log_file(log_file, error_percent)
+        requests = la.extract_info_from_file(log_file, error_percent)
         self.assertEqual(requests, {
             'GET /api/v2/banner/25019354 HTTP/1.1': [0.39],
             'GET /api/1/photogenic_banners/list/?server_name=WIN7RB4 HTTP/1.1': [0.133],
@@ -129,7 +129,7 @@ class ParseLogFileTestCase(unittest.TestCase):
     def test_error_limit(self):
         log_file = la.LogFile(pathlib.Path('log/test_log_error'), date(2019, 1, 1), ext='')
         error_percent = 10
-        self.assertRaises(ValueError, la.parse_log_file, log_file, error_percent)
+        self.assertRaises(ValueError, la.extract_info_from_file, log_file, error_percent)
 
 
 class PrepareReportDataTestCase(unittest.TestCase):

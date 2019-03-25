@@ -69,11 +69,10 @@ def get_config_path():
     Returns:
         str: Configuration file path
     """
-    # Read arguments
     parser = argparse.ArgumentParser()
     parser.add_argument('-c', '--config', help='Path to config file')
     args = parser.parse_args()
-    # Find necessary argument value
+
     config_path = args.config if args.config else DEFAULT_CONFIG_PATH
     return config_path
 
@@ -88,11 +87,10 @@ def load_config():
     Raises:
         TypeError: If configuration is not a dictionary
     """
-    # Load file
     config_path = get_config_path()
     with open(config_path, 'r') as f:
         config = json.load(f)
-    # Ensure that configuration is dictionary
+
     if not isinstance(config, dict):
         raise TypeError('Configuration is not a dictionary')
     return {
@@ -127,19 +125,21 @@ def get_latest_log_file(log_dir):
     Raises:
         FileNotFoundError: If log directory does not exists or is not directory
     """
-    # Check if directory exists
     if not (log_dir.exists() and log_dir.is_dir()):
         raise FileNotFoundError('Log directory does not exists')
-    # Find file
+
     log_file = None
     for path in log_dir.iterdir():
-        # Check that name matches the pattern
         matches = re.findall(LOG_FILE_MASK, path.name)
         if not matches:
             continue
         date, ext = matches[0]
-        # Check if file has biggest date
-        log_date = datetime.strptime(date, '%Y%m%d').date()
+
+        try:
+            log_date = datetime.strptime(date, '%Y%m%d').date()
+        except ValueError:
+            continue
+
         if not log_file or log_file.date < log_date:
             log_file = LogFile(path, log_date, ext)
 
@@ -160,10 +160,9 @@ def get_report_path(log_file, report_dir):
     Raises:
         FileNotFoundError: If report directory does not exists or is not directory
     """
-    # Check if directory exists
     if not report_dir.exists() or not report_dir.is_dir():
         raise FileNotFoundError('Report directory does not exists')
-    # Generate path
+
     report_date = log_file.date.strftime('%Y.%m.%d')
     report_path = report_dir.joinpath('report-{}.html'.format(report_date))
     return report_path
@@ -179,11 +178,10 @@ def parse_line(line):
     Returns:
         LogLine: Request data
     """
-    # Check if line matches pattern
     match = LOG_LINE_MASK.findall(line)
     if not match:
         return None
-    # Check if there is some information about request
+
     url = match[0][4]
     request_time = match[0][-1]
     if not (url and request_time):
@@ -191,9 +189,29 @@ def parse_line(line):
     return LogLine(url, float(request_time))
 
 
-def parse_log_file(log_file, error_percent):
+def parse_log_file(log_file):
     """
-    Parse log file and extract information about requests
+    Parse log file and extract information about requests line by line
+
+    Args:
+        log_file (LogFile): Log file
+
+    Returns:
+        LogLine: Single request data
+    """
+    if log_file.ext == '.gz':
+        f = gzip.open(log_file.path.absolute(), 'rt')
+    else:
+        f = open(str(log_file.path), encoding='utf-8')
+
+    with f:
+        for line in f:
+            yield parse_line(line)
+
+
+def extract_info_from_file(log_file, error_percent):
+    """
+    Extract information about requests from log file
 
     Args:
         log_file (LogFile): Log file
@@ -205,24 +223,16 @@ def parse_log_file(log_file, error_percent):
     Raises:
         ValueError: If log errors limit was exceeded
     """
-    # Get file handler
-    if log_file.ext == '.gz':
-        f = gzip.open(log_file.path.absolute(), 'rt')
-    else:
-        f = open(str(log_file.path), encoding='utf-8')
-
     lines = 0
     fails = 0
     requests = defaultdict(list)
-    # Read file
-    with f:
-        for line in f:
-            lines += 1
-            request = parse_line(line)
-            if request:
-                requests[request.url].append(request.request_time)
-            else:
-                fails += 1
+    for request in parse_log_file(log_file):
+        lines += 1
+        if request:
+            requests[request.url].append(request.request_time)
+        else:
+            fails += 1
+
     # Check error percentage
     errors = 100 * fails / lines
     if errors > error_percent:
@@ -243,13 +253,12 @@ def prepare_report_data(requests, report_size):
     Returns:
         List: Report data
     """
-    # Find total request count and total request time
     total_count = 0
     total_time = 0.0
     for request_times in requests.values():
         total_count += len(request_times)
         total_time += sum(request_times)
-    # Generate report data
+
     report_data = []
     for url, request_times in requests.items():
         request_count = len(request_times)
@@ -295,37 +304,35 @@ def create_report(report_data, report_dir, log_date):
 
 
 def main():
-    # Prepare config
     config = load_config()
     setup_logger(config.get('LOG_FILE'))
 
-    try:
-        # Get log file
-        log_dir = pathlib.Path(config.get('LOG_DIR'))
-        log_file = get_latest_log_file(log_dir)
-        if not log_file:
-            logging.info('No logs in "{}"'.format(log_file))
-            return
+    # 1. Get log file instance
+    log_dir = pathlib.Path(config.get('LOG_DIR'))
+    log_file = get_latest_log_file(log_dir)
+    if not log_file:
+        logging.info('No logs in "{}"'.format(log_file))
+        return
 
-        # Get report file path
-        report_dir = pathlib.Path(config.get('REPORT_DIR'))
-        report_path = get_report_path(log_file, report_dir)
-        if report_path.exists():
-            logging.info('Report for "{}" already exists'.format(log_file.date))
-            return
+    # 2. Get report file path
+    report_dir = pathlib.Path(config.get('REPORT_DIR'))
+    report_path = get_report_path(log_file, report_dir)
+    if report_path.exists():
+        logging.info('Report for "{}" already exists'.format(log_file.date))
+        return
 
-        # Process log
-        requests = parse_log_file(log_file, config.get('ERROR_PERCENT'))
-        report_data = prepare_report_data(requests, config.get('REPORT_SIZE'))
-        report_path = create_report(report_data, report_dir, log_file.date)
+    # 3. Extract logs and create report
+    requests = extract_info_from_file(log_file, config.get('ERROR_PERCENT'))
+    report_data = prepare_report_data(requests, config.get('REPORT_SIZE'))
+    report_path = create_report(report_data, report_dir, log_file.date)
 
-        # Final notification
-        logging.info('Report "{}" from file "{}" was created successfully'.format(
-            report_path, log_file.path
-        ))
-    except Exception as e:
-        logging.exception(e)
+    logging.info('Report "{}" from file "{}" was created successfully'.format(
+        report_path, log_file.path
+    ))
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception as e:
+        logging.exception(e)
