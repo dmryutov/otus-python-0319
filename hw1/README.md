@@ -7,7 +7,7 @@
 Запуск:
 
 ```bash
-python poker.py
+python3 poker.py
 ```
 
 
@@ -19,7 +19,7 @@ python poker.py
 Запуск:
 
 ```bash
-python deco.py
+python3 deco.py
 ```
 
 
@@ -32,11 +32,11 @@ python deco.py
 
 ```bash
 cd log_analyzer
-python log_analyzer.py
+python3 log_analyzer.py
 ```
 
 Тесты:
 
 ```bash
-python tests.py
+python3 tests.py
 ```
