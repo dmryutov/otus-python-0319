@@ -8,6 +8,7 @@ from optparse import OptionParser
 import uuid
 
 from scoring import get_score, get_interests
+from store import Store, RedisStorage
 
 
 SALT = 'Otus'
@@ -55,6 +56,18 @@ class FieldBase(object):
             value: Field value
         """
         pass
+
+    def to_python(self, value):
+        """
+        Convert value to Python structures
+
+        Args:
+            value: Field value
+
+        Returns:
+            Field value in some representation
+        """
+        return value
 
 
 class CharField(FieldBase):
@@ -172,6 +185,21 @@ class DateField(CharField):
         except (ValueError, TypeError):
             raise ValueError('Field value should be in DD.MM.YYYY format')
 
+    def to_python(self, value):
+        """
+        Convert value to datetime structure
+
+        Args:
+            value: Field value
+
+        Returns:
+            Field value in datetime representation
+        """
+        try:
+            return self.to_date(value)
+        except (ValueError, TypeError):
+            return value
+
 
 class BirthDayField(DateField):
     """
@@ -287,6 +315,8 @@ class RequestBase(object):
                 field.validate(value)
             except (TypeError, ValueError) as e:
                 self.errors[name] = str(e)
+            # Convert value to some field representation
+            setattr(self, name, field.to_python(value))
 
 
 class ClientsInterestsRequest(RequestBase):
@@ -428,7 +458,7 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
     router = {
         'method': method_handler
     }
-    store = None
+    store = Store(RedisStorage())
 
     @staticmethod
     def get_request_id(headers):
