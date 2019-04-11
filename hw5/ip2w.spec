@@ -12,7 +12,7 @@ Requires(post): systemd
 Requires(preun): systemd
 Requires(postun): systemd
 BuildRequires: systemd
-Requires: python-requests
+Requires: python3-requests
 Summary: Weather uWSGI daemon
 
 
@@ -60,5 +60,4 @@ systemctl daemon-reload
 %{__logdir}
 %{__bindir}
 %{__systemddir}
-%{__sysconfigdir}
 %{__etcdir}
