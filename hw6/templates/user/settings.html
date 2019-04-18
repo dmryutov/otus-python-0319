@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+
+{% block title %}
+    Settings
+{% endblock %}
+
+
+{% block page_title %}
+    Settings
+{% endblock %}
+
+
+{% block content %}
+    <form enctype="multipart/form-data" method="POST">
+        {% csrf_token %}
+
+        <div class="form-group row">
+            <label class="col-sm-3 col-form-label">Login</label>
+            <div class="col-sm-9">
+                <p class="col-form-label">{{ request.user.username }}</p>
+            </div>
+        </div>
+        <div class="form-group row">
+            <label class="col-sm-3 col-form-label" for="{{ form.email.id_for_label }}">Email</label>
+            <div class="col-sm-9">
+                <input
+                    type="email"
+                    class="form-control"
+                    id="{{ form.email.id_for_label }}"
+                    name="{{ form.email.html_name }}"
+                    value="{{ form.email.value }}"
+                >
+                {% if form.email.errors %}
+                    <small class="form-text text-danger">{{ form.email.errors }}</small>
+                {% endif %}
+            </div>
+        </div>
+        <div class="form-group row">
+            <label class="col-sm-3 col-form-label" for="{{ form.avatar.id_for_label }}">Avatar</label>
+            <div class="col-sm-9">
+                <p><img src="{{ form.avatar.value.url }}" width="100" alt="Avatar"></p>
+                <input
+                    type="file"
+                    accept="image/*"
+                    id="{{ form.avatar.id_for_label }}"
+                    name="{{ form.avatar.html_name }}"
+                >
+                {% if form.avatar.errors %}
+                    <small class="form-text text-danger">{{ form.avatar.errors }}</small>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if form.non_field_errors %}
+            <p class="text-danger">{{ form.non_field_errors.as_text }}</p>
+        {% endif %}
+        <button class="btn btn-success" type="submit">Submit</button>
+    </form>
+{% endblock %}

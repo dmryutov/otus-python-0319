@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+
+
+{% block title %}
+    {% if mode == 'list' %}New Questions
+    {% elif mode == 'hot' %}Hot Questions
+    {% elif mode == 'search' %}Search Result
+    {% elif mode == 'tag' %}Tag Result
+    {% endif %}
+{% endblock %}
+
+
+{% block page_title %}
+    {% if mode == 'list' %}
+        <b>New Questions</b><span class="mx-2">|</span>
+        <a href="{% url 'question_hot' %}">Hot Questions</a>
+    {% elif mode == 'hot' %}
+        <a href="{% url 'question_list' %}">New Questions</a>
+        <span class="mx-2">|</span><b>Hot Questions</b>
+    {% elif mode == 'search' %}
+        Search Result: "{{ search_query }}"
+    {% elif mode == 'tag' %}
+        Tag Result: "{{ tag_query }}"
+    {% endif %}
+{% endblock %}
+
+
+{% block content %}
+    <div class="question-list">
+        {% if question_list %}
+            {% for question in question_list %}
+                <div class="question-list-item">
+                    <div class="stat">
+                        <div class="stat-item">
+                            <div class="mini-counts">
+                                {{ question.rating }}
+                            </div>
+                            <div>votes</div>
+                        </div>
+                        <div class="stat-item {% if question.answers.count %}answered{% endif %} {% if question.accepted_answer %}accepted{% endif %}">
+                            <div class="mini-counts">
+                                {{ question.answers.count }}
+                            </div>
+                            <div>answers</div>
+                        </div>
+                    </div>
+                    <div class="info">
+                        <h5>
+                            <a href="{% url 'question_detail' question.id %}">{{ question.title|truncatechars:50 }}</a>
+                        </h5>
+                        <div class="tags">
+                            {% for tag in question.tags.all %}
+                                <a href="{% url 'tag_detail' tag.name %}" class="badge badge-success">
+                                    {{ tag.name }}
+                                </a>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <div class="author">
+                        <div><b>{{ question.user.username }}</b> asked</div>
+                        <div>{{ question.created|timesince }} ago</div>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <p class="text-center mb-0">There is no questions</p>
+        {% endif %}
+    </div>
+
+    {% include 'ui/pagination.html' with page_obj=page_obj %}
+{% endblock %}

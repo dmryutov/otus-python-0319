@@ -1,0 +1,26 @@
+{% load trending %}
+
+<a href="{% url 'question_add' %}" class="btn btn-primary btn-block ask-btn">Ask!</a>
+
+<div class="card block box-shadow mt-3">
+    <div class="card-header bg-success">
+        Trending
+    </div>
+    <div class="card-body">
+        {% trending_questions as popular %}
+        {% if popular %}
+            <ul class="list-unstyled mb-0 popular">
+                {% for question in popular %}
+                    <li>
+                        <span class="badge badge-success">{{ question.rating }}</span>
+                        <a href="{% url 'question_detail' question.id %}">
+                            {{ question.title|truncatechars:22 }}
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="mb-0">No questions</p>
+        {% endif %}
+    </div>
+</div>

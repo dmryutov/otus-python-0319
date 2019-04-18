@@ -1,0 +1,143 @@
+{% extends 'base.html' %}
+{% load static %}
+
+
+{% block title %}
+    {{ question.title }}
+{% endblock %}
+
+
+{% block page_title %}
+    {{ question.title }}
+{% endblock %}
+
+
+{% block content %}
+    <!-- QUESTION -->
+    <div class="qa-detail">
+        <div class="rating">
+            {% if request.user.is_authenticated and request.user != question.user %}
+                <a href="#" class="arrow arrow-up" data-id="{{ question.id }}" data-object="question" data-value="up"></a>
+                <span>{{ question.rating }}</span>
+                <a href="#" class="arrow arrow-down" data-id="{{ question.id }}" data-object="question" data-value="down"></a>
+            {% else %}
+                <span>{{ question.rating }}</span>
+            {% endif %}
+        </div>
+        <div class="info">
+            <div class="text">
+                {{ question.text|linebreaks }}
+            </div>
+            <div class="info-bottom mt-3">
+                <div class="tags">
+                    {% for tag in question.tags.all %}
+                        <a href="{% url 'tag_detail' tag.name %}" class="badge badge-success">
+                            {{ tag.name }}
+                        </a>
+                    {% endfor %}
+                </div>
+                <div class="author">
+                    <span class="date">{{ question.created }}</span>
+                    <img src="{{ question.user.avatar.url }}" width=32 height="32" alt="Avatar" />
+                    <span>{{ question.user.username }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ANSWERS -->
+    {% if answers %}
+        <div class="answer-list mt-5">
+            <h3>Answers</h3>
+            {% for answer in answers %}
+                <hr>
+                <div class="qa-detail">
+                    <div class="rating">
+                        {% if request.user.is_authenticated and request.user != answer.user %}
+                            <a href="#" class="arrow arrow-up" data-id="{{ answer.id }}" data-object="answer" data-value="up"></a>
+                            <span>{{ answer.rating }}</span>
+                            <a href="#" class="arrow arrow-down" data-id="{{ answer.id }}" data-object="answer" data-value="down"></a>
+                        {% else %}
+                            <span>{{ answer.rating }}</span>
+                        {% endif %}
+
+                        {% if answer == question.accepted_answer %}
+                            <span class="accepted"></span>
+                        {% elif user == question.user %}
+                            <a class="accepted accept-btn" href="#" data-answer="{{ answer.id }}"></a>
+                        {% endif %}
+                    </div>
+                    <div class="info">
+                        <div class="text">
+                            {{ answer.text|linebreaks }}
+                        </div>
+                        <div class="info-bottom mt-3">
+                            <div class="author">
+                                <span class="date">{{ answer.created }}</span>
+                                <img src="{{ answer.user.avatar.url }}" width=32 height="32" alt="Avatar" />
+                                <span>{{ answer.user.username }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% include 'ui/pagination.html' with page_obj=page_obj %}
+    {% endif %}
+
+    <!-- ANSWER FORM -->
+    {% if request.user.is_authenticated %}
+        <hr>
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="form-group">
+                <label for="{{ form.text.id_for_label }}">Your Answer</label>
+                <textarea class="form-control" id="{{ form.text.id_for_label }}" name="{{ form.text.html_name }}" rows="5"></textarea>
+                {% if form.text.errors %}
+                    <small class="form-text text-danger">{{ form.text.errors }}</small>
+                {% endif %}
+            </div>
+            {% if form.non_field_errors %}
+                <p class="text-danger">{{ form.non_field_errors.as_text }}</p>
+            {% endif %}
+            <button type="submit" class="btn btn-success">Submit</button>
+        </form>
+    {% endif %}
+{% endblock %}
+
+
+{% block js %}
+    <script>
+        $(document).ready(() => {
+            $('.accept-btn').on('click', (event) => {
+                event.preventDefault();
+
+                const params = $(event.currentTarget).data();
+                $.post(`/answer/${params.answer}/accept/`, {
+                    csrfmiddlewaretoken: $('input[name="csrfmiddlewaretoken"]').val(),
+                }).done(() => {
+                    location.reload();
+                }).fail(() => {
+                    alert('An error occurred while accepting answer');
+                });
+            });
+
+            $('.arrow').on('click', (event) => {
+                event.preventDefault();
+
+                const params = $(event.currentTarget).data();
+                $.post('/vote/', {
+                    id: params.id,
+                    object: params.object,
+                    value: params.value,
+                    csrfmiddlewaretoken: $('input[name="csrfmiddlewaretoken"]').val(),
+                }).done(() => {
+                    location.reload();
+                }).fail(() => {
+                    alert('An error occurred while voting');
+                });
+            });
+        });
+    </script>
+{% endblock %}

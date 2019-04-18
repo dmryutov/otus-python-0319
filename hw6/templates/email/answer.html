@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>{{ subject }}</title>
+</head>
+<body>
+    <p>Hello, <b>{{ question.user.username }}</b>!</p>
+    <p></p>
+    <p><b>{{ answer.user.username }}</b> answered to your question "<b><a href="{{ link }}">{{ question.title }}</a></b>":</p>
+    <p></p>
+    <p>{{ answer.text|linebreaksbr }}</p>
+</body>
+</html>

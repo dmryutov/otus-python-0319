@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+{% load static %}
+
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, shrink-to-fit=no, user-scalable=no">
+
+        <title>{% block title %}{% endblock %} | Hasker</title>
+
+        <link rel="stylesheet" href="{% static 'libs/bootstrap/bootstrap.min.css' %}">
+        <link rel="stylesheet" href="{% static 'css/style.css' %}">
+        {% block css %}{% endblock %}
+    </head>
+    <body>
+        <!-- HEADER -->
+        {% include 'ui/header.html' %}
+
+        <!-- PAGE -->
+        <div class="container page-wrapper">
+            <div class="row">
+                <!-- CONTENT -->
+                <main class="col-md-9">
+                    <div class="card block box-shadow">
+                        <div class="card-header bg-success">
+                            {% block page_title %}{% endblock %}
+                        </div>
+                        <div class="card-body">
+                            {% block content %}{% endblock %}
+                        </div>
+                    </div>
+                </main>
+                <!-- SIDEBAR -->
+                <aside class="col-md-3 sidebar">
+                    {% include 'ui/sidebar.html' %}
+                </aside>
+            </div>
+        </div>
+
+        <!-- FOOTER -->
+        <footer class="my-5 text-muted text-center text-small">
+            <p class="mb-1">© {% now 'Y' %} Hasker</p>
+        </footer>
+
+        <!-- SCRIPTS -->
+        <script src="{% static 'libs/jquery.min.js' %}"></script>
+        <script src="{% static 'libs/bootstrap/bootstrap.min.js' %}"></script>
+        {% block js %}{% endblock %}
+    </body>
+</html>
