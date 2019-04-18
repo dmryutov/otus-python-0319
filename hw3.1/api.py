@@ -464,8 +464,6 @@ def method_handler(request, ctx, store):
     }
 
     method_request = MethodRequest(request['body'])
-    method_request.validate()
-
     if not method_request.is_valid():
         return method_request.format_errors(), INVALID_REQUEST
     if method_request.method not in handlers:
