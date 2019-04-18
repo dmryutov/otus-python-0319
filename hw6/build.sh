@@ -13,20 +13,22 @@ DB_PASSWORD=Hasker12345
 
 echo "=== Install packages (1/7) ==="
 yum clean all
-yum install -y epel-release https://centos7.iuscommunity.org/ius-release.rpm
-yum install -y sudo wget git gcc-c++ python36u python36u-devel python36u-pip nginx postgresql-server postgresql-contrib postgresql-devel
+yum install -y epel-release
+yum install -y https://centos7.iuscommunity.org/ius-release.rpm
+yum install -y https://download.postgresql.org/pub/repos/yum/9.6/redhat/rhel-7-x86_64/pgdg-oraclelinux96-9.6-3.noarch.rpm
+yum install -y sudo wget git gcc-c++ make python36u python36u-devel python36u-pip nginx postgresql96-server postgresql96-contrib postgresql96-devel
 
 
 echo "=== Install hack for systemd (2/7) ==="
 wget https://raw.githubusercontent.com/gdraheim/docker-systemctl-replacement/master/files/docker/systemctl.py -O /usr/local/bin/systemctl
 chmod +x /usr/local/bin/systemctl
-alias systemctl2='/usr/local/bin/systemctl'
 
 
 echo "=== Configure PostgreSQL (3/7) ==="
-sudo -u postgres /usr/bin/initdb /var/lib/pgsql/data/
-echo "listen_addresses='*'" >> /var/lib/pgsql/data/postgresql.conf
-sudo -u postgres /usr/bin/pg_ctl start -D /var/lib/pgsql/data -s -o "-p 5432" -w -t 300
+export PATH="$PATH:/usr/pgsql-9.6/bin/"
+postgresql96-setup initdb
+echo "listen_addresses='*'" >> /var/lib/pgsql/9.6/data/postgresql.conf
+sudo -u postgres /usr/pgsql-9.6/bin/pg_ctl start -D /var/lib/pgsql/9.6/data -s -o "-p 5432" -w -t 300
 su postgres -c "psql -c \"CREATE USER ${DB_USER} PASSWORD '${DB_PASSWORD}'\""
 su postgres -c "psql -c \"CREATE DATABASE ${DB_NAME} OWNER ${DB_USER}\""
 
@@ -52,8 +54,9 @@ server {
     }
 }
 EOF
-systemctl2 enable nginx
-systemctl2 start nginx
+/usr/local/bin/systemctl enable nginx
+/usr/local/bin/systemctl start nginx
+/usr/local/bin/systemctl status nginx
 
 
 echo "=== Configure uWSGI (5/7) ==="
