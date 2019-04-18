@@ -267,19 +267,29 @@ class ClientIDsField(FieldBase):
             raise ValueError('Field value items should be numbers')
 
 
-class RequestBase(object):
+class RequestMeta(type):
+    """
+    Request handler metaclass
+    """
+    def __new__(cls, name, bases, attrs):
+        fields = {
+            key: field
+            for key, field in attrs.items()
+            if isinstance(field, FieldBase)
+        }
+        for key in fields:
+            del attrs[key]
+        attrs['fields'] = fields
+        return super().__new__(cls, name, bases, attrs)
+
+
+class RequestBase(metaclass=RequestMeta):
     """
     Request handler base class
     """
     def __init__(self, body):
         self.errors = {}
-        self.fields = {}
-
-        for name in dir(self):
-            field = getattr(self, name, None)
-            if isinstance(field, FieldBase):
-                self.fields[name] = field
-                setattr(self, name, body.get(name))
+        self.body = body
 
     def is_empty(self, name):
         """
@@ -293,12 +303,23 @@ class RequestBase(object):
         """
         return getattr(self, name, None) in (None, '', [], {}, ())
 
+    def is_valid(self):
+        """
+        Check if all request fields are valid
+
+        Returns:
+            bool: True if all request fields are valid
+        """
+        self.validate()
+        return not self.errors
+
     def validate(self):
         """
         Validate request fields
         """
         for name, field in self.fields.items():
-            value = getattr(self, name, None)
+            value = self.body.get(name)
+            setattr(self, name, value)
             # Check `required` parameter
             if field.required and value is None:
                 self.errors[name] = 'Field is required'
@@ -317,6 +338,15 @@ class RequestBase(object):
                 self.errors[name] = str(e)
             # Convert value to some field representation
             setattr(self, name, field.to_python(value))
+
+    def format_errors(self):
+        """
+        Format validation errors
+
+        Returns:
+            str: Validation errors
+        """
+        return str(self.errors)
 
 
 class ClientsInterestsRequest(RequestBase):
@@ -436,8 +466,8 @@ def method_handler(request, ctx, store):
     method_request = MethodRequest(request['body'])
     method_request.validate()
 
-    if method_request.errors:
-        return method_request.errors, INVALID_REQUEST
+    if not method_request.is_valid():
+        return method_request.format_errors(), INVALID_REQUEST
     if method_request.method not in handlers:
         return ERRORS[NOT_FOUND], NOT_FOUND
     if not check_auth(method_request):
