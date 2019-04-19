@@ -38,6 +38,15 @@ GENDERS = {
 }
 
 
+class AgeLimitError(ValueError):
+    pass
+
+
+class PhoneFormatError(ValueError):
+    pass
+
+
+
 class FieldBase(object):
     """
     Field base class
@@ -134,9 +143,9 @@ class PhoneField(FieldBase):
 
         val = str(value)
         if len(val) != 11:
-            raise ValueError('Field value length should be 11 characters')
+            raise PhoneFormatError('Field value length should be 11 characters')
         if not val.startswith('7'):
-            raise ValueError('Field value should starts with "7"')
+            raise PhoneFormatError('Field value should starts with "7"')
 
 
 class DateField(CharField):
@@ -190,7 +199,7 @@ class BirthDayField(DateField):
 
         age = (datetime.now() - self.to_date(value)).days / 365
         if not (0 < age <= 70):
-            raise ValueError('Age should be in range 0 < age <= 70')
+            raise AgeLimitError('Age should be in range 0 < age <= 70')
 
 
 class GenderField(FieldBase):
@@ -236,7 +245,7 @@ class ClientIDsField(FieldBase):
         if not value:
             raise ValueError('Field value can not be empty')
         if not all(isinstance(item, int) for item in value):
-            raise ValueError('Field value items should be numbers')
+            raise TypeError('Field value items should be numbers')
 
 
 class RequestMeta(type):
@@ -321,25 +330,15 @@ class RequestBase(metaclass=RequestMeta):
 
 class ClientsInterestsRequest(RequestBase):
     """
-    Clients interests request handler
+    Clients interests request
     """
     client_ids = ClientIDsField(required=True)
     date = DateField(required=False, nullable=True)
 
-    def get_response(self, store, context, is_admin):
-        """
-        Return user's interests for selected ids
-        """
-        context['nclients'] = len(self.client_ids)
-        return {
-            cid: get_interests(store, cid)
-            for cid in self.client_ids
-        }
-
 
 class OnlineScoreRequest(RequestBase):
     """
-    Online scoring request handler
+    Online scoring request
     """
     first_name = CharField(required=False, nullable=True)
     last_name = CharField(required=False, nullable=True)
@@ -369,22 +368,50 @@ class OnlineScoreRequest(RequestBase):
             self.errors['invalid_pairs'] = 'Request should have at least ' \
                                            'one non-empty pair: {}'.format(self.pairs)
 
-    def get_response(self, store, context, is_admin):
+
+class ClientsInterestsRequestHandler(object):
+    """
+    Clients interests request handler
+    """
+    request_class = ClientsInterestsRequest
+
+    def get_response(self, request, store, context):
+        """
+        Return user's interests for selected ids
+        """
+        r = self.request_class(request.arguments)
+        if not r.is_valid():
+            return r.format_errors(), INVALID_REQUEST
+
+        context['nclients'] = len(r.client_ids)
+        interests = {cid: get_interests(store, cid) for cid in r.client_ids}
+        return interests, OK
+
+
+class OnlineScoreRequestHandler(object):
+    """
+    Online scoring request handler
+    """
+    request_class = OnlineScoreRequest
+
+    def get_response(self, request, store, context):
         """
         Return user's score based on given user fields
         """
-        context['has'] = [
-            name
-            for name in self.fields.keys()
-            if not self.is_empty(name)
-        ]
+        r = self.request_class(request.arguments)
+        if not r.is_valid():
+            return r.format_errors(), INVALID_REQUEST
 
-        if is_admin:
-            result = 42
+        context['has'] = [
+            name for name in r.fields.keys()
+            if not r.is_empty(name)
+        ]
+        if request.is_admin:
+            score = 42
         else:
-            result = get_score(store, self.phone, self.email, self.birthday, self.gender,
-                               self.first_name, self.last_name)
-        return {'score': result}
+            score = get_score(store, r.phone, r.email, r.birthday, r.gender, r.first_name,
+                              r.last_name)
+        return {'score': score}, OK
 
 
 class MethodRequest(RequestBase):
@@ -429,8 +456,8 @@ def method_handler(request, ctx, store):
     Process and validate requests
     """
     handlers = {
-        'online_score': OnlineScoreRequest,
-        'clients_interests': ClientsInterestsRequest,
+        'online_score': OnlineScoreRequestHandler,
+        'clients_interests': ClientsInterestsRequestHandler,
     }
 
     method_request = MethodRequest(request['body'])
@@ -441,12 +468,8 @@ def method_handler(request, ctx, store):
     if not check_auth(method_request):
         return ERRORS[FORBIDDEN], FORBIDDEN
 
-    handler = handlers[method_request.method](method_request.arguments)
-    handler.validate()
-    if handler.errors:
-        return handler.errors, INVALID_REQUEST
-
-    return handler.get_response(store, ctx, method_request.is_admin), OK
+    handler = handlers[method_request.method]()
+    return handler.get_response(method_request, store, ctx)
 
 
 class MainHTTPHandler(BaseHTTPRequestHandler):

@@ -161,7 +161,7 @@ class TestClientIDsField(unittest.TestCase):
 
     @cases([[10, '45', 'sdfsdfs']])
     def test_invalid_value(self, value):
-        self.assertRaises(ValueError, self.field.validate, value)
+        self.assertRaises(TypeError, self.field.validate, value)
 
 
 if __name__ == '__main__':
