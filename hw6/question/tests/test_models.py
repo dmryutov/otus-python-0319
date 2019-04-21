@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from question.models import Question, Tag, Vote
+from question.models import Answer, Question, Tag, Vote
 from user.models import User
 
 
@@ -26,6 +26,25 @@ class QuestionTestCase(TestCase):
 
     def test_model_str(self):
         self.assertEqual(str(self.question), 'Title 1')
+
+    def test_get_answers(self):
+        # Create questions
+        answer1 = Answer.objects.create(question=self.question, user=self.user, text='text 1')
+        answer2 = Answer.objects.create(question=self.question, user=self.user, text='text 2')
+        self.question.answers.set([answer1, answer2])
+
+        answers = self.question.get_answers()
+        self.assertEqual(len(answers), 2)
+        self.assertEqual(answers[0].id, answer2.id)
+
+    def test_get_tag_names(self):
+        # Create tags
+        tag1 = Tag.objects.create(name='tag1')
+        tag2 = Tag.objects.create(name='tag2')
+        self.question.tags.set([tag1, tag2])
+
+        tags = self.question.get_tag_names()
+        self.assertEqual(tags, ['tag1', 'tag2'])
 
 
 class QAManagerTestCase(TestCase):

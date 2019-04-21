@@ -15,8 +15,10 @@ urlpatterns = [
     # Applications endpoints
     path('user/', include('user.urls')),
     path('', include('question.urls')),
-
-    # Static and media files
-    *static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT),
-    *staticfiles_urlpatterns(),
 ]
+
+
+# Static and media files
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += staticfiles_urlpatterns()

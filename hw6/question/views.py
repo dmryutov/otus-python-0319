@@ -3,11 +3,12 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core import paginator
 from django.db.models import Q
-from django.http.response import HttpResponse, HttpResponseForbidden, HttpResponseBadRequest
+from django.http.response import JsonResponse, HttpResponseForbidden, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views.generic import ListView, DetailView, CreateView, View
+from django.views.generic.edit import FormMixin
 
 from .forms import QuestionForm, AnswerForm
 from .models import Question, Answer
@@ -64,45 +65,49 @@ class QuestionListView(ListView):
         return super().dispatch(request, *args, **kwargs)
 
 
-class QuestionDetailView(DetailView):
+class QuestionDetailView(FormMixin, DetailView):
     """Question detail endpoint"""
     model = Question
+    form_class = AnswerForm
     template_name = 'question/detail.html'
     paginate_by = settings.ANSWER_PER_PAGE
 
     def get_queryset(self):
         return Question.objects.load_rating()
 
+    def get_success_url(self):
+        return reverse_lazy('question_detail', kwargs={'pk': self.object.pk})
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        answers = self.object.answers.load_rating() \
-            .order_by('-accept_for_question', '-rating', '-created')
-        answers_paginator = paginator.Paginator(answers, self.paginate_by)
+        page_obj = self.get_answer_page_obj()
+        context['page_obj'] = page_obj
+        context['answers'] = page_obj.object_list
+        context['form'] = self.get_form()
+        return context
+
+    def get_answer_page_obj(self):
+        answers_paginator = paginator.Paginator(self.object.get_answers(), self.paginate_by)
         try:
             page_obj = answers_paginator.page(self.request.GET.get('page', 1))
         except paginator.InvalidPage:
             page_obj = answers_paginator.page(1)
+        return page_obj
 
-        context['page_obj'] = page_obj
-        context['answers'] = page_obj.object_list
-        context['form'] = AnswerForm()
-        return context
 
     @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
 
-        form = AnswerForm(request.POST)
+        form = self.get_form()
         if form.is_valid():
             answer = self.object.answers.create(text=form.cleaned_data['text'],
                                                 question=self.object,
                                                 user=request.user)
             send_email_notification(request, self.object, answer)
             return redirect(request.path)
-        context = self.get_context_data(object=self.object)
-        context['form'] = form
-        return self.render_to_response(context)
+        return self.form_invalid(form)
 
 
 class QuestionAddView(LoginRequiredMixin, CreateView):
@@ -128,7 +133,7 @@ class AnswerAcceptView(LoginRequiredMixin, View):
             return HttpResponseForbidden()
         question.accepted_answer = answer
         question.save(update_fields=['accepted_answer'])
-        return HttpResponse()
+        return JsonResponse({})
 
 
 class VoteView(LoginRequiredMixin, View):
@@ -152,4 +157,4 @@ class VoteView(LoginRequiredMixin, View):
                 vote.value = vote_value
                 vote.save(update_fields=['value'])
 
-        return HttpResponse()
+        return JsonResponse({})
