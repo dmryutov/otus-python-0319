@@ -81,13 +81,13 @@ class QuestionDetailView(FormMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
-        page_obj = self.get_answer_page_obj()
+        page_obj = self.get_answer_pagination()
         context['page_obj'] = page_obj
         context['answers'] = page_obj.object_list
         context['form'] = self.get_form()
         return context
 
-    def get_answer_page_obj(self):
+    def get_answer_pagination(self):
         answers_paginator = paginator.Paginator(self.object.get_answers(), self.paginate_by)
         try:
             page_obj = answers_paginator.page(self.request.GET.get('page', 1))
