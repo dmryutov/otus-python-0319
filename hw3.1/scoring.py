@@ -36,5 +36,5 @@ def get_interests(store, cid):
     """
     Get user interests
     """
-    r = store.get('i:%s'.format(cid))
+    r = store.get('i:{}'.format(cid))
     return json.loads(r) if r else []

@@ -45,7 +45,7 @@ class RedisStorage:
         except redis.RedisError:
             raise ConnectionError
 
-    def set(self, key, value, expires=0):
+    def set(self, key, value, expires=None):
         try:
             return self.db.set(key, value, ex=expires)
         except redis.exceptions.TimeoutError:
@@ -69,5 +69,5 @@ class Store:
         return self.storage.get(key)
 
     @retry(attempts=max_retries, silent=True)
-    def cache_set(self, key, value, expires=0):
+    def cache_set(self, key, value, expires=None):
         return self.storage.set(key, value, expires)

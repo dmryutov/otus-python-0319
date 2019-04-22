@@ -1,21 +1,28 @@
-import hashlib
 import datetime
+import hashlib
+import json
 import unittest
+from unittest.mock import patch
 
 import api
 from store import Store, RedisStorage
 from .utils import cases
 
 
+MOCK_CID = '260d8f9aeae0418598aba67f789dc145'
+MOCK_INTERESTS = ['cars', 'pets', 'travel', 'hi-tech', 'sport', 'music', 'books', 'tv', 'cinema',
+                  'geek', 'otus']
+
+
 class TestSuite(unittest.TestCase):
     def setUp(self):
         self.context = {}
         self.headers = {}
-        self.settings = Store(RedisStorage())
+        self.store = Store(RedisStorage())
 
     def get_response(self, request):
         return api.method_handler({'body': request, 'headers': self.headers}, self.context,
-                                  self.settings)
+                                  self.store)
 
     @staticmethod
     def set_valid_auth(request):
@@ -129,7 +136,11 @@ class TestSuite(unittest.TestCase):
         {'client_ids': [1, 2], 'date': '19.07.2017'},
         {'client_ids': [0]},
     ])
-    def test_ok_interests_request(self, arguments):
+    @patch.object(api.uuid, 'uuid4', side_effect=[MOCK_CID])
+    def test_ok_interests_request(self, arguments, mock_uuid):
+        for cid in arguments['client_ids']:
+            self.store.cache_set('i:{}'.format(cid), json.dumps(MOCK_INTERESTS), 60)
+
         request = {'account': 'horns&hoofs', 'login': 'h&f', 'method': 'clients_interests',
                    'arguments': arguments}
         self.set_valid_auth(request)
