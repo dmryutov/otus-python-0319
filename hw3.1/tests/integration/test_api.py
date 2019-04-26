@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import api
 from store import Store, RedisStorage
-from .utils import cases
+from ..utils import cases
 
 
 MOCK_CID = '260d8f9aeae0418598aba67f789dc145'

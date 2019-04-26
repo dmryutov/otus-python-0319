@@ -20,14 +20,15 @@ def retry(attempts=5, silent=True):
 
 
 class RedisStorage:
-    def __init__(self, host='localhost', port=6379, timeout=3):
+    def __init__(self, host='localhost', port=6379, timeout=3, connect_now=True):
         self.host = host
         self.port = port
         self.timeout = timeout
         self.db = None
-        self.reconnect()
+        if connect_now:
+            self.connect()
 
-    def reconnect(self):
+    def connect(self):
         self.db = redis.Redis(
             host=self.host,
             port=self.port,

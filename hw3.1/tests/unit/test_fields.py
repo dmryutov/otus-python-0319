@@ -2,7 +2,7 @@ from datetime import datetime
 import unittest
 
 import api
-from .utils import cases
+from ..utils import cases
 
 
 class TestCharField(unittest.TestCase):
