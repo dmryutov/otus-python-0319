@@ -1,12 +1,18 @@
+import os
 import unittest
 from unittest.mock import MagicMock
 
 from store import Store, RedisStorage
 
 
+@unittest.skipIf(
+    not (os.environ.get('REDIS_HOST') and os.environ.get('REDIS_PORT')),
+    'Require "REDIS_HOST" and "REDIS_PORT" environment variables'
+)
 class TestStore(unittest.TestCase):
     def setUp(self):
-        self.redis_storage = RedisStorage()
+        self.redis_storage = RedisStorage(host=os.environ.get('REDIS_HOST'),
+                                          port=int(os.environ.get('REDIS_PORT')))
         self.store = Store(self.redis_storage)
         self.key = 'key1'
         self.value = 'value1'
