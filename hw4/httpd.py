@@ -43,83 +43,43 @@ class HTTPRequest(object):
     """
     methods = ('GET', 'HEAD')
 
-    def __init__(self, connection, client_address, document_root):
+    def __init__(self, document_root):
         """
         Args:
-            connection (socket.socket): Socket connection to client
-            client_address (tuple): Socket client address (host, port)
             document_root (str): Files root directory
         """
-        self.worker_id = os.getpid()
-        self.thread_id = threading.current_thread().name
-        self.connection = connection
-        self.client_address = client_address
         self.document_root = document_root
-        self.request_headers = {}
-        self.process_request()
 
-    def process_request(self):
-        """
-        Process request - parse request, prepare and send response
-        """
-        try:
-            request = self.receive()
-            code, method, path = self.parse_request(request)
-            self.send_response(code, method, path)
-        except Exception:
-            logging.exception('[Worker {} | {}] Error while sending response to {}'.format(
-                self.worker_id, self.thread_id, self.client_address
-            ))
-        finally:
-            logging.debug('[Worker {} | {}] Closing socket for {}'.format(
-                self.worker_id, self.thread_id, self.client_address
-            ))
-            self.connection.close()
-
-    def receive(self):
-        """
-        Receive request data
-
-        Returns:
-            str: Request data
-        """
-        result = ''
-        while True:
-            chunk = self.connection.recv(CHUNK_SIZE)
-            result += chunk.decode()
-            if HEAD_TERMINATOR in result or not chunk:
-                break
-        return result
-
-    def parse_request(self, request):
+    def parse(self, request_data):
         """
         Parse request data
 
         Args:
-            request (str): Request data
+            request_data (str): Raw request data
 
         Returns:
-            (int, str, str): (Response code, Request method, Request document path)
+            (int, str, str, dict): (Response code, Request method, Request document path)
         """
-        lines = request.split('\r\n')
+        lines = request_data.split('\r\n')
         try:
             method, url, version = lines[0].split()
             method = method.upper()
         except ValueError:
-            return HTTP_400_BAD_REQUEST, '?', '?'
+            return HTTP_400_BAD_REQUEST, '?', '?', {}
 
+        headers = {}
         for line in lines[1:]:
             if not line.split():
                 break
             k, v = line.split(':', 1)
-            self.request_headers[k.lower()] = v.strip()
+            headers[k.lower()] = v.strip()
 
         if method not in self.methods:
-            return HTTP_405_METHOD_NOT_ALLOWED, method, url
+            return HTTP_405_METHOD_NOT_ALLOWED, method, url, headers
 
         code, path = self.parse_url(url)
 
-        return code, method, path
+        return code, method, path, headers
 
     def parse_url(self, url):
         """
@@ -147,28 +107,38 @@ class HTTPRequest(object):
 
         return HTTP_200_OK, path
 
-    def send_response(self, code, method, path):
-        """
-        Prepare and send response
 
+class HTTPResponse(object):
+    def __init__(self, code, method, path, request_headers):
+        """
         Args:
             code (int): Response code
-            method (str): Request method
+            method (str): Response method
             path (str): Request document path
+            request_headers (dict): Request headers
+        """
+        self.code = code
+        self.method = method
+        self.path = path
+        self.request_headers = request_headers
+
+    def process(self):
+        """
+        Prepare and send response
         """
         # Prepare meta info
         file_size = 0
         content_type = 'text/plain'
         body = b''
-        if code == HTTP_200_OK:
-            file_size = self.request_headers.get('content-length', os.path.getsize(path))
-            if method == 'GET':
-                content_type = mimetypes.guess_type(path)[0]
-                with open(path, 'rb') as file:
+        if self.code == HTTP_200_OK:
+            file_size = self.request_headers.get('content-length', os.path.getsize(self.path))
+            if self.method == 'GET':
+                content_type = mimetypes.guess_type(self.path)[0]
+                with open(self.path, 'rb') as file:
                     body = file.read(file_size)
 
         # Prepare response
-        first_line = '{} {} {}'.format(PROTOCOL, code, RESPONSE_CODES[code])
+        first_line = '{} {} {}'.format(PROTOCOL, self.code, RESPONSE_CODES[self.code])
         headers = {
             'Date': datetime.now().strftime('%a, %d %b %Y %H:%M:%S GMT'),
             'Server': SERVER_NAME,
@@ -178,11 +148,57 @@ class HTTPRequest(object):
         }
         headers = '\r\n'.join('{}: {}'.format(k, v) for k, v in headers.items())
         response = '{}\r\n{}{}'.format(first_line, headers, HEAD_TERMINATOR).encode() + body
+        return response
 
-        logging.info('[Worker {} | {}] "{} {} {}" {} {}'.format(
-            self.worker_id, self.thread_id, method, path, PROTOCOL, code, file_size
+
+def receive(connection):
+    """
+    Receive request data
+
+    Returns:
+        str: Request data
+    """
+    result = ''
+    while True:
+        chunk = connection.recv(CHUNK_SIZE)
+        result += chunk.decode()
+        if HEAD_TERMINATOR in result or not chunk:
+            break
+    return result
+
+
+def process_request(connection, client_address, document_root):
+    """
+    Process request - parse request, prepare and send response
+
+    Args:
+        connection (socket.socket): Socket connection to client
+        client_address (tuple): Socket client address (host, port)
+        document_root (str): Files root directory
+    """
+    worker_id = os.getpid()
+    thread_id = threading.current_thread().name
+
+    try:
+        request_data = receive(connection)
+        request = HTTPRequest(document_root)
+        code, method, path, headers = request.parse(request_data)
+        response = HTTPResponse(code, method, path, headers)
+        response_data = response.process()
+
+        logging.info('[Worker {} | {}] "{} {} {}" {}'.format(
+            worker_id, thread_id, method, path, PROTOCOL, code
         ))
-        self.connection.sendall(response)
+        connection.sendall(response_data)
+    except Exception:
+        logging.exception('[Worker {} | {}] Error while sending response to {}'.format(
+            worker_id, thread_id, client_address
+        ))
+    finally:
+        logging.debug('[Worker {} | {}] Closing socket for {}'.format(
+            worker_id, thread_id, client_address
+        ))
+        connection.close()
 
 
 class HTTPServer(object):
@@ -224,7 +240,7 @@ class HTTPServer(object):
                 connection, client_address = self.socket.accept()
                 logging.debug('[Worker {}] Request from {}'.format(os.getpid(), client_address))
                 thread = threading.Thread(
-                    target=HTTPRequest,
+                    target=process_request,
                     args=(connection, client_address, self.document_root)
                 )
                 thread.daemon = True
