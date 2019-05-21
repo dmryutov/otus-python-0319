@@ -5,7 +5,6 @@ import mimetypes
 import multiprocessing
 import os
 import socket
-import threading
 from urllib.parse import unquote, urlparse
 
 
@@ -177,7 +176,6 @@ def process_request(connection, client_address, document_root):
         document_root (str): Files root directory
     """
     worker_id = os.getpid()
-    thread_id = threading.current_thread().name
 
     try:
         request_data = receive(connection)
@@ -186,17 +184,17 @@ def process_request(connection, client_address, document_root):
         response = HTTPResponse(code, method, path, headers)
         response_data = response.process()
 
-        logging.info('[Worker {} | {}] "{} {} {}" {}'.format(
-            worker_id, thread_id, method, path, PROTOCOL, code
+        logging.info('[Worker {}] "{} {} {}" {}'.format(
+            worker_id, method, path, PROTOCOL, code
         ))
         connection.sendall(response_data)
     except Exception:
-        logging.exception('[Worker {} | {}] Error while sending response to {}'.format(
-            worker_id, thread_id, client_address
+        logging.exception('[Worker {}] Error while sending response to {}'.format(
+            worker_id, client_address
         ))
     finally:
-        logging.debug('[Worker {} | {}] Closing socket for {}'.format(
-            worker_id, thread_id, client_address
+        logging.debug('[Worker {}] Closing socket for {}'.format(
+            worker_id, client_address
         ))
         connection.close()
 
@@ -239,12 +237,7 @@ class HTTPServer(object):
             try:
                 connection, client_address = self.socket.accept()
                 logging.debug('[Worker {}] Request from {}'.format(os.getpid(), client_address))
-                thread = threading.Thread(
-                    target=process_request,
-                    args=(connection, client_address, self.document_root)
-                )
-                thread.daemon = True
-                thread.start()
+                process_request(connection, client_address, self.document_root)
             except OSError:
                 if connection:
                     connection.close()

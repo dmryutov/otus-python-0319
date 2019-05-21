@@ -82,26 +82,26 @@ Waiting:       22  202  54.1    193     729
 Total:         25  204  54.3    194     754
 
 Percentage of the requests served within a certain time (ms)
-  50%    194
-  66%    207
-  75%    216
-  80%    223
-  90%    255
-  95%    298
-  98%    359
-  99%    412
- 100%    754 (longest request)
+  50%    267
+  66%    282
+  75%    295
+  80%    305
+  90%    366
+  95%    465
+  98%    676
+  99%    885
+ 100%   1666 (longest request)
 ```
 
 Результаты нагрузочного тестирования с помощью **wrk** (2 воркера):
 
 ```
-Running 5m test @ http://127.0.0.1:8080/dir2/page.html
+Running 5m test @ http://127.0.0.1:8080/page.html
   2 threads and 100 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
-    Latency   200.15ms   78.54ms   1.37s    91.40%
-    Req/Sec   257.82     75.99   520.00     74.50%
-  152444 requests in 5.00m, 25.73MB read
-Requests/sec:    508.45
-Transfer/sec:     87.89KB
+    Latency   263.28ms   68.87ms   1.36s    95.13%
+    Req/Sec   193.94     96.69   444.00     63.32%
+  114992 requests in 5.00m, 19.41MB read
+Requests/sec:    383.48
+Transfer/sec:     66.29KB
 ```
