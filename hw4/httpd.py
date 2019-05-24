@@ -12,7 +12,9 @@ DOCUMENT_ROOT = 'www'
 """Default files root directory"""
 
 CHUNK_SIZE = 1024
-"""Maximum chunk size"""
+"""Request chunk size"""
+MAX_REQUEST_SIZE = 8192
+"""Maximum request size"""
 HEAD_TERMINATOR = '\r\n\r\n'
 """Head section termination sequence"""
 
@@ -161,7 +163,9 @@ def receive(connection):
     while True:
         chunk = connection.recv(CHUNK_SIZE)
         result += chunk.decode()
-        if HEAD_TERMINATOR in result or not chunk:
+        if not chunk:
+            raise ConnectionError
+        if HEAD_TERMINATOR in result or len(result) >= MAX_REQUEST_SIZE:
             break
     return result
 
