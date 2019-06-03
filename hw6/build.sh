@@ -3,11 +3,11 @@
 echo "=== Load settings (1/8) ==="
 PROJECT_NAME=hasker
 PROJECT_PATH=$(pwd)
+DEBUG=False
 SECRET_KEY="$(date +%s | sha256sum | base64 | head -c 50)"
-CONFIG="main.settings.production"
-DB_NAME=hasker
-DB_USER=hasker
-DB_PASSWORD=Hasker12345
+POSTGRES_DB=hasker
+POSTGRES_USER=hasker
+POSTGRES_PASSWORD=Hasker12345
 
 
 echo "=== Install packages (2/8) ==="
@@ -30,8 +30,8 @@ echo "listen_addresses='*'" >> /var/lib/pgsql/9.6/data/postgresql.conf
 sed -ie 's/ident/trust/g' /var/lib/pgsql/9.6/data/pg_hba.conf
 sed -ie 's/peer/trust/g' /var/lib/pgsql/9.6/data/pg_hba.conf
 sudo -u postgres /usr/pgsql-9.6/bin/pg_ctl start -D /var/lib/pgsql/9.6/data -s -o "-p 5432" -w -t 300
-su postgres -c "psql -c \"CREATE USER ${DB_USER} PASSWORD '${DB_PASSWORD}'\""
-su postgres -c "psql -c \"CREATE DATABASE ${DB_NAME} OWNER ${DB_USER}\""
+su postgres -c "psql -c \"CREATE USER ${POSTGRES_USER} PASSWORD '${POSTGRES_PASSWORD}'\""
+su postgres -c "psql -c \"CREATE DATABASE ${POSTGRES_DB} OWNER ${POSTGRES_USER}\""
 
 
 echo "=== Configure Nginx (5/8) ==="
@@ -43,11 +43,11 @@ server {
     access_log /var/log/nginx/${PROJECT_NAME}-access.log combined;
     error_log  /var/log/nginx/${PROJECT_NAME}-error.log error;
 
-    location /static/ {
-        alias ${PROJECT_PATH}/static/;
+    location /staticfiles/ {
+        alias ${PROJECT_PATH}/staticfiles/;
     }
-    location /media/ {
-        alias ${PROJECT_PATH}/media/;
+    location /mediafiles/ {
+        alias ${PROJECT_PATH}/mediafiles/;
     }
     location / {
         uwsgi_pass unix:/run/uwsgi/${PROJECT_NAME}.sock;
@@ -86,11 +86,11 @@ echo "=== Configure Django (7/8) ==="
 pip3.6 install -r requirements.txt
 for CMD in "makemigrations" "migrate" "collectstatic --link --noinput"
 do
-    DJANGO_SETTINGS_MODULE=${CONFIG} \
+    DEBUG=${DEBUG} \
     SECRET_KEY=${SECRET_KEY} \
-    DB_NAME=${DB_NAME} \
-    DB_USER=${DB_USER} \
-    DB_PASSWORD=${DB_PASSWORD} \
+    POSTGRES_DB=${POSTGRES_DB} \
+    POSTGRES_USER=${POSTGRES_USER} \
+    POSTGRES_PASSWORD=${POSTGRES_PASSWORD} \
     python3.6 manage.py ${CMD}
 done
 

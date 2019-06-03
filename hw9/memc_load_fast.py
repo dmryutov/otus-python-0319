@@ -47,8 +47,6 @@ class MemcacheWriter(Thread):
                         processed += 1
                     else:
                         errors += 1
-                if processed % 5000 == 0:
-                    print(processed, errors, os.getpid(), self.name, appsinstalled.dev_type)
             except Empty:
                 continue
 

@@ -69,7 +69,7 @@ def get_config_path():
     Returns:
         str: Configuration file path
     """
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description='Log Analyzer')
     parser.add_argument('-c', '--config', help='Path to config file')
     args = parser.parse_args()
 

@@ -9,8 +9,6 @@ import re
 from aiohttp import ClientSession, ClientTimeout, TCPConnector
 from lxml import etree
 
-import traceback
-
 
 MAX_HOST_CONNECTIONS = 3
 """Number of maximum simultaneous connections to single host"""

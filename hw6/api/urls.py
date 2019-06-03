@@ -17,5 +17,5 @@ urlpatterns = [
     path('question/trending/', views.TrendingListView.as_view(), name='api_trending_list'),
     path('question/search/', views.SearchListView.as_view(), name='api_search_list'),
     path('question/<int:pk>/', views.QuestionDetailView.as_view(), name='api_question_detail'),
-    path('question/<int:pk>/answers/', views.AnswerListView.as_view(), name='api_answer_list'),
+    path('question/<int:pk>/answer/', views.AnswerListView.as_view(), name='api_answer_list'),
 ]

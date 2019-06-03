@@ -533,9 +533,9 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    op = OptionParser()
-    op.add_option('-p', '--port', action='store', type=int, default=8080)
-    op.add_option('-l', '--log', action='store', default=None)
+    op = OptionParser(description='Scoring API')
+    op.add_option('-p', '--port', action='store', type=int, default=8080, help='Port binding')
+    op.add_option('-l', '--log', action='store', default=None, help='Log file path')
     opts, args = op.parse_args()
     logging.basicConfig(filename=opts.log,
                         level=logging.INFO,

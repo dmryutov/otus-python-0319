@@ -1,8 +1,9 @@
+Django
+Pillow
 coreapi
-django
-django-cors-headers
+django-cors-headers==2.5.*
 djangorestframework
 djangorestframework-jwt
-Pillow
+gunicorn
 psycopg2
 uwsgi

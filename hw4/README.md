@@ -2,16 +2,39 @@
 
 ## OTUServer
 
-Разработка веб‑сервера, частично реализующего протокол HTTP.
+HTTP server with implemented GET and HEAD methods.
 
-Архитектура — **Multi-threaded** на **N** воркерах. Воркеры реализованы на основе процессов с помощью модуля `multiprocessing`. На каждый запрос пользователя внутри выбранного процесса создается новый поток, в котором происходит обработка запроса и формирование ответа.
+**Architecture:**
+
+N workers (processes) from `multiprocessing` module. Each worker accepts requests concurrently, then process it and generate response.
+
+**Server should:**
+
+- Scale to multiple workers
+- The number of workers specified in `‑w` command line argument
+- Return `200`, `403` or `404` for GET and HEAD requests
+- Return `405` for other requests
+- Return files to an arbitrary path in `DOCUMENT_ROOT`
+- `/file.html` should return the content `DOCUMENT_ROOT/file.html`
+- `DOCUMENT_ROOT` is specified in `‑r` command line argument
+- Return `index.html` as directory index
+- `/directory/` should return `DOCUMENT_ROOT/directory/index.html`
+- Return the following headers for successful GET requests: `Date`, `Server`, `Content-Length`, `Content-Type`, `Connection`
+- Correct `Content‑Type` for: `.html`, `.css`, `.js`, `.jpg`, `.jpeg`, `.png`, `.gif`, `.swf`
+- Understand spaces and `%XX` in file names
 
 
-Описание параметров:
 
-```
+### Requirements
+
+- Python 3.x
+
+
+
+### How to run
+
+```bash
 $ python3 httpd.py -h
-
 
 usage: httpd.py [-h] [-s HOST] [-p PORT] [-w WORKERS] [-r ROOT] [-d]
 
@@ -27,18 +50,28 @@ optional arguments:
   -d, --debug           Show debug messages
 ```
 
-Тесты:
+Run in Docker:
 
 ```bash
-# Unit-тесты
-python3 httptest.py
-# Нагрузочное тестирование с помощью Apache Benchmark
-ab -n 50000 -c 100 -r http://127.0.0.1:8080/page.html
-# Нагрузочное тестирование с помощью wrk
-wrk -c100 -d5m http://127.0.0.1:8080/page.html
+docker-compose up -d --build
 ```
 
-Результаты нагрузочного тестирования с помощью **Apache Benchmark** (2 воркера):
+
+
+### Testing
+
+```bash
+# Clone repository with test files
+git clone https://github.com/s-stupnikov/http-test-suite www
+# Unit-tests
+python3 httptest.py
+# Load testing with "Apache Benchmark"
+ab -n 50000 -c 100 -r http://127.0.0.1:8080/httptest/dir2/page.html
+# Load testing with "wrk"
+wrk -c100 -d5m http://127.0.0.1:8080/httptest/dir2/page.html
+```
+
+Load testing results with **Apache Benchmark** (2 workers):
 
 ```
 Benchmarking 127.0.0.1 (be patient)
@@ -59,7 +92,7 @@ Server Software:        OTUServer
 Server Hostname:        127.0.0.1
 Server Port:            8080
 
-Document Path:          /page.html
+Document Path:          /httptest/dir2/page.html
 Document Length:        38 bytes
 
 Concurrency Level:      100
@@ -93,10 +126,10 @@ Percentage of the requests served within a certain time (ms)
  100%   1666 (longest request)
 ```
 
-Результаты нагрузочного тестирования с помощью **wrk** (2 воркера):
+Load testing results with **wrk** (2 workers):
 
 ```
-Running 5m test @ http://127.0.0.1:8080/page.html
+Running 5m test @ http://127.0.0.1:8080/httptest/dir2/page.html
   2 threads and 100 connections
   Thread Stats   Avg      Stdev     Max   +/- Stdev
     Latency   263.28ms   68.87ms   1.36s    95.13%

@@ -6,13 +6,13 @@ from store import Store, RedisStorage
 
 
 @unittest.skipIf(
-    not (os.environ.get('REDIS_HOST') and os.environ.get('REDIS_PORT')),
+    not (os.getenv('REDIS_HOST') and os.getenv('REDIS_PORT')),
     'Require "REDIS_HOST" and "REDIS_PORT" environment variables'
 )
 class TestStore(unittest.TestCase):
     def setUp(self):
-        self.redis_storage = RedisStorage(host=os.environ.get('REDIS_HOST'),
-                                          port=int(os.environ.get('REDIS_PORT')))
+        self.redis_storage = RedisStorage(host=os.getenv('REDIS_HOST'),
+                                          port=int(os.getenv('REDIS_PORT')))
         self.store = Store(self.redis_storage)
         self.key = 'key1'
         self.value = 'value1'

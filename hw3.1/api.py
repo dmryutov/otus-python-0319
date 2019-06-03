@@ -5,6 +5,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import json
 import logging
 from optparse import OptionParser
+import os
 import uuid
 
 from scoring import get_score, get_interests
@@ -508,7 +509,8 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
     router = {
         'method': method_handler
     }
-    store = Store(RedisStorage())
+    store = Store(RedisStorage(host=os.getenv('REDIS_HOST', 'localhost'),
+                               port=int(os.getenv('REDIS_PORT', '6379'))))
 
     @staticmethod
     def get_request_id(headers):
@@ -562,9 +564,9 @@ class MainHTTPHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == '__main__':
-    op = OptionParser()
-    op.add_option('-p', '--port', action='store', type=int, default=8080)
-    op.add_option('-l', '--log', action='store', default=None)
+    op = OptionParser(description='Scoring API')
+    op.add_option('-p', '--port', action='store', type=int, default=8080, help='Port binding')
+    op.add_option('-l', '--log', action='store', default=None, help='Log file path')
     opts, args = op.parse_args()
     logging.basicConfig(filename=opts.log,
                         level=logging.INFO,

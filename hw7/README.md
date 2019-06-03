@@ -2,10 +2,29 @@
 
 ## Logistic Regression
 
-Реализация своего логистического регрессора, который будет классифицировать отзывы из Amazon.
+Complete custom logistic regression classifier which should process reviews from Amazon.
 
-Установка зависимостей:
+
+
+### Requirements
+
+- Python 3.x
+- Jupyter Notebook
+
+
+
+### Install dependencies
 
 ```bash
 pip3 install -r requirements.txt
+```
+
+
+
+### How to run
+
+Run in Docker:
+
+```bash
+docker-compose up -d --build
 ```

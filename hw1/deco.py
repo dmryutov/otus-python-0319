@@ -53,7 +53,7 @@ def memo(func):
 def n_ary(func):
     """
     Given binary function f(x, y), return an n_ary function such
-    that f(x, y, z) = f(x, f(y,z)), etc. Also allow f(x) = x.
+    that f(x, y, z) = f(x, f(y, z)), etc. Also allow f(x) = x.
     """
     def wrapper(x, *args):
         return x if not args else func(x, wrapper(*args))

@@ -1,5 +1,7 @@
 from datetime import timedelta
 import os
+from pathlib import Path
+import sys
 
 from django.urls import reverse_lazy
 
@@ -8,8 +10,27 @@ from django.urls import reverse_lazy
 VERSION = '1.0.0'
 
 
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.getenv('SECRET_KEY')
+
+
+# Debug mode
+DEBUG = os.getenv('DEBUG') == 'True'
+TESTING = len(sys.argv) > 1 and sys.argv[1] == 'test'
+
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+BASE_DIR = Path(__file__).parent.parent
+
+
+# Allowed hosts
+ALLOWED_HOSTS = [
+    '0.0.0.0',
+    '127.0.0.1',
+    'localhost',
+    'backend',
+    'nginx',
+]
 
 
 # Application definition
@@ -21,10 +42,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
 
+    'corsheaders',
     'django.contrib.postgres',
     'rest_framework',
     'rest_framework.authtoken',
-    'corsheaders',
 
     'api',
     'question',
@@ -66,6 +87,26 @@ TEMPLATES = [
 WSGI_APPLICATION = 'main.wsgi.application'
 
 
+# Database
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': os.getenv('POSTGRES_DB'),
+        'USER': os.getenv('POSTGRES_USER'),
+        'PASSWORD': os.getenv('POSTGRES_PASSWORD'),
+        'HOST': os.getenv('POSTGRES_HOST'),
+        'PORT': os.getenv('POSTGRES_PORT'),
+        'OPTIONS': {
+            'options': '-c search_path=public',
+        },
+        'TEST': {
+            'NAME': os.getenv('POSTGRES_DB'),
+            'CREATE_DB': False,
+        }
+    }
+}
+
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -92,6 +133,23 @@ USE_L10N = False
 USE_TZ = False
 DATE_FORMAT = 'd.m.Y'
 DATETIME_FORMAT = 'd.m.Y H:i:s'
+
+
+# Static and media files (CSS, JavaScript, Images)
+STATIC_URL = '/staticfiles/'
+if DEBUG:
+    STATIC_PATH = BASE_DIR.joinpath('staticfiles')
+    STATIC_PATH.mkdir(exist_ok=True)
+    STATICFILES_DIRS = (
+        STATIC_PATH,
+    )
+else:
+    STATIC_ROOT = BASE_DIR.joinpath('staticfiles')
+    STATIC_ROOT.mkdir(exist_ok=True)
+
+MEDIA_URL = '/mediafiles/'
+MEDIA_ROOT = BASE_DIR.joinpath('mediafiles')
+MEDIA_ROOT.mkdir(exist_ok=True)
 
 
 # Urls
@@ -124,6 +182,8 @@ CORS_ALLOW_HEADERS = [
 CORS_ORIGIN_WHITELIST = (
     'localhost:8000',
     '127.0.0.1:8000',
+    'localhost:8080',
+    '127.0.0.1:8080',
 )
 
 REST_FRAMEWORK = {
@@ -145,3 +205,14 @@ JWT_AUTH = {
     'JWT_EXPIRATION_DELTA': timedelta(days=90),
     'JWT_REFRESH_EXPIRATION_DELTA': timedelta(days=90),
 }
+
+
+# Email
+EMAIL_FROM = 'info@hasker.ru'
+if DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+elif TESTING:
+    EMAIL_BACKEND = 'django.core.mail.backends.dummy.EmailBackend'
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.filebased.EmailBackend'
+    EMAIL_FILE_PATH = '/tmp/hasker-emails'

@@ -77,7 +77,7 @@ class Question(QABase):
         Returns:
             django.db.models.QuerySet: Answers
         """
-        return self.answers.load_rating().order_by('-accept_for_question', '-rating', '-created')
+        return self.answers.load_rating().order_by('accept_for_question', '-rating', '-created')
 
     def get_tag_names(self):
         """
