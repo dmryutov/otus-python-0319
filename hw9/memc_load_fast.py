@@ -12,7 +12,7 @@ from queue import Queue, Empty
 
 import memcache
 
-import appsinstalled_pb2
+from appsinstalled import appsinstalled_pb2
 
 
 NORMAL_ERR_RATE = 0.01
@@ -172,8 +172,8 @@ def main(options):
 
 
 def prototest():
-    sample = 'idfa\t1rfw452y52g2gq4g\t55.55\t42.42\t1423,43,567,3,7,23\ngaid\t' \
-             '7rfw452y52g2gq4g\t55.55\t42.42\t7423,424'
+    sample = 'idfa\t1rfw452y52g2gq4g\t55.55\t42.42\t1423,43,567,3,7,23\n' \
+             'gaid\t7rfw452y52g2gq4g\t55.55\t42.42\t7423,424'
     for line in sample.splitlines():
         dev_type, dev_id, lat, lon, raw_apps = line.strip().split('\t')
         apps = [int(a) for a in raw_apps.split(',') if a.isdigit()]
