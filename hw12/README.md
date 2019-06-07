@@ -1,4 +1,4 @@
-# Homework 12: Concurrency
+# Homework 12: Golang
 
 ## MemcLoad v2
 
