@@ -8,5 +8,4 @@ RUN pip install --no-cache-dir -q -r requirements.txt
 WORKDIR /app
 COPY . .
 
-EXPOSE 8080
 CMD ["python", "memc_load_fast.py", "--pattern=/data/*.tsv.gz"]

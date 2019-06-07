@@ -110,14 +110,14 @@ def file_handler(fn, options):
     }
 
     thread_pool = {}
-    queue_pool = {}
+    job_pool = {}
     result_queue = Queue()
-    for device, memc_addr in device_memc.items():
+    for dev_type, memc_addr in device_memc.items():
         memc = memcache.Client([memc_addr])
-        job_queue = Queue()
-        worker = MemcacheWriter(job_queue, result_queue, memc, options.dry, options.attempts)
-        thread_pool[device] = worker
-        queue_pool[device] = job_queue
+        job_pool[dev_type] = Queue()
+        worker = MemcacheWriter(job_pool[dev_type], result_queue, memc, options.dry,
+                                options.attempts)
+        thread_pool[dev_type] = worker
         worker.start()
 
     processed = errors = 0
@@ -131,14 +131,14 @@ def file_handler(fn, options):
         if not appsinstalled:
             errors += 1
             continue
-        device = appsinstalled.dev_type
-        if device not in device_memc:
+        dev_type = appsinstalled.dev_type
+        if dev_type not in device_memc:
             errors += 1
             logging.error('Unknown device type: %s' % appsinstalled.dev_type)
             continue
-        queue_pool[device].put(appsinstalled)
+        job_pool[dev_type].put(appsinstalled)
 
-    for q in queue_pool.values():
+    for q in job_pool.values():
         q.put(SENTINEL)
     for t in thread_pool.values():
         t.join()
