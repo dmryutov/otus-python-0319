@@ -54,7 +54,7 @@ func dotRename(path string) {
 }
 
 
-func insertAppsInstalled(memc *MemcacheClient, ai *AppsInstalled, dryRun bool) bool {
+func insertAppsinstalled(memc *MemcacheClient, ai *AppsInstalled, dryRun bool) bool {
     ua := &appsinstalled.UserApps{
         Lat: proto.Float64(ai.lat),
         Lon: proto.Float64(ai.lon),
@@ -179,7 +179,7 @@ func processFiles(options *Options) {
                 continue
             }
 
-            ok := insertAppsInstalled(&memc, &ai, options.dry)
+            ok := insertAppsinstalled(&memc, &ai, options.dry)
             if ok {
                 processed += 1
             } else {

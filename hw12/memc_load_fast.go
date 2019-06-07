@@ -62,7 +62,7 @@ func memcacheWriter(jobQueue <-chan *AppsInstalled, resultQueue chan<- Result, m
             resultQueue <- Result{processed, errors}
             processed, errors = 0, 0
         } else {
-            ok := insertAppsInstalled(&memc, ai, dryRun, attempts)
+            ok := insertAppsinstalled(&memc, ai, dryRun, attempts)
             if ok {
                 processed += 1
             } else {
@@ -99,7 +99,7 @@ func dotRename(path string) {
 }
 
 
-func insertAppsInstalled(memc *MemcacheClient, ai *AppsInstalled, dryRun bool, attempts int) bool {
+func insertAppsinstalled(memc *MemcacheClient, ai *AppsInstalled, dryRun bool, attempts int) bool {
     ua := &appsinstalled.UserApps{
         Lat: proto.Float64(ai.lat),
         Lon: proto.Float64(ai.lon),
