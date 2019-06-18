@@ -6,7 +6,7 @@ Add new opcode (combine `LOAD_FAST` and `LOAD_CONST`) to the Python interpreter.
 
 **Useful links:**
 
-- [https://blog.quarkslab.com/building-an-obfuscated-python-interpreter-we-need-more-opcodes.html](https://blog.quarkslab.com/building-an-obfuscated-python-interpreter-we-need-more-opcodes.html)
+- [Building an obfuscated Python interpreter: we need more opcodes](https://blog.quarkslab.com/building-an-obfuscated-python-interpreter-we-need-more-opcodes.html)
 - [https://gist.github.com/serge-sans-paille/71a4b1e656d70ae94bb4](https://gist.github.com/serge-sans-paille/71a4b1e656d70ae94bb4)
 
 ### Steps
@@ -47,8 +47,8 @@ Add new `until` statement to the Python interpreter.
 
 **Useful links:**
 
-- [https://eli.thegreenplace.net/2010/06/30/python-internals-adding-a-new-statement-to-python/](https://eli.thegreenplace.net/2010/06/30/python-internals-adding-a-new-statement-to-python/)
-- [https://devguide.python.org/grammar/](https://devguide.python.org/grammar/)
+- [Python internals: adding a new statement to Python](https://eli.thegreenplace.net/2010/06/30/python-internals-adding-a-new-statement-to-python/)
+- [Changing CPython’s Grammar](https://devguide.python.org/grammar/)
 
 ### Steps
 
@@ -90,7 +90,7 @@ Add new `++` and `--` operators to the Python interpreter.
 
 **Useful links:**
 
-- [https://hackernoon.com/modifying-the-python-language-in-7-minutes-b94b0a99ce14](https://hackernoon.com/modifying-the-python-language-in-7-minutes-b94b0a99ce14)
+- [Modifying the Python language in 7 minutes](https://hackernoon.com/modifying-the-python-language-in-7-minutes-b94b0a99ce14)
 
 ### Steps
 

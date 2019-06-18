@@ -1,4 +1,4 @@
-# Homework 07: LogRegression
+# Homework 07: NumPy
 
 ## Logistic Regression
 

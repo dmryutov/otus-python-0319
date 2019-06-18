@@ -68,6 +68,13 @@ docker-compose up -d memcached
 pip3 install -r requirements.txt
 ```
 
+Generate `appsinstalled_pb2.py` (if you want to create project from scratch):
+
+```bash
+cd appsinstalled
+protoc --python_out=. appsinstalled.proto
+```
+
 
 
 ### How to run

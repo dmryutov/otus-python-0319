@@ -1,4 +1,3 @@
-
 # Homework 06: Django Project
 
 ## Hasker: Poor Man's Stackoverflow

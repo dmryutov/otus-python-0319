@@ -4,7 +4,7 @@ import (
     "bufio"
     "compress/gzip"
     "errors"
-	"flag"
+    "flag"
     "fmt"
     "log"
     "os"

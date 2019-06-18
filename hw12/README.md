@@ -74,7 +74,7 @@ sudo mv protoc3/include/* /usr/local/include/
 Generate `appsinstalled.pb.go` (if you want to create project from scratch):
 
 ```bash
-mkdir appsinstalled && cd appsinstalled
+cd appsinstalled
 protoc --go_out=. appsinstalled.proto
 go install appsinstalled.pb.go
 ```

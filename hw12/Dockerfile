@@ -8,7 +8,7 @@ COPY memc_load.go .
 # Dirty hack to fix relative import
 RUN sed -i 's/".\/appsinstalled"/"appsinstalled"/g' memc_load.go
 
-RUN go get -d ./...
-RUN go install ./...
+RUN go get -d ./... \
+    && go install ./...
 
 CMD ["app", "--pattern=/data/*.tsv.gz"]

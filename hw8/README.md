@@ -1,4 +1,4 @@
-# Homework 08: Open Data Analysis
+# Homework 08: Pandas
 
 ## Open Data Science
 
