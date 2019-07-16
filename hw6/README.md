@@ -98,7 +98,7 @@ Make migrations:
 Start server for your REST-API:
 
 ```bash
-./manage.py runserver 127.0.0.1:8050
+./manage.py runserver 127.0.0.1:8000
 ```
 
 

@@ -19,6 +19,7 @@ NORMAL_ERR_RATE = 0.01
 AppsInstalled = collections.namedtuple('AppsInstalled',
                                        ['dev_type', 'dev_id', 'lat', 'lon', 'apps'])
 SENTINEL = object()
+CHUNK_SIZE = 50
 
 
 class MemcacheWriter(Thread):
@@ -36,50 +37,64 @@ class MemcacheWriter(Thread):
         processed = errors = 0
         while True:
             try:
-                appsinstalled = self.job_queue.get(timeout=0.1)
-                if appsinstalled == SENTINEL:
+                chunks = self.job_queue.get(timeout=0.1)
+                if chunks == SENTINEL:
                     self.result_queue.put((processed, errors))
                     logging.info('[Worker %s] Stop thread: %s' % (os.getpid(), self.name))
                     break
                 else:
-                    ok = self.insert_appsinstalled(appsinstalled)
-                    if ok:
-                        processed += 1
-                    else:
-                        errors += 1
+                    chunks = {
+                        key: value
+                        for key, value in
+                        (self.parse_appsinstalled(appsinstalled) for appsinstalled in chunks)
+                    }
+                    proc_items, err_items = self.insert_appsinstalled(chunks)
+                    processed += proc_items
+                    errors += err_items
             except Empty:
                 continue
 
-    def insert_appsinstalled(self, appsinstalled):
+    def parse_appsinstalled(self, appsinstalled):
         ua = appsinstalled_pb2.UserApps()
         ua.lat = appsinstalled.lat
         ua.lon = appsinstalled.lon
         key = '%s:%s' % (appsinstalled.dev_type, appsinstalled.dev_id)
         ua.apps.extend(appsinstalled.apps)
         packed = ua.SerializeToString()
+        return (key, packed)
+
+    def insert_appsinstalled(self, chunks):
+        processed = errors = 0
         try:
             if self.dry_run:
-                logging.debug('%s - %s -> %s' % (self.memc, key, str(ua).replace('\n', ' ')))
+                for key, value in chunks.items():
+                    logging.debug('%s - %s -> %s' % (self.memc, key, value))
+                    processed += 1
             else:
-                memcache_set(self.memc, key, packed, self.attempts)
+                processed, errors = self.memcache_set(self.memc, chunks)
         except Exception as e:
             logging.exception('Cannot write to memc %s: %s' % (self.memc.servers[0], e))
-            return False
-        return True
+        return processed, errors
+
+    def memcache_set(self, memc, chunks):
+        failed_items = memc.set_multi(chunks)
+        attempts = 0
+        while failed_items and attempts < self.attempts:
+            failed_items = memc.set_multi({
+                key: value
+                for key, value in chunks.items()
+                if key in failed_items
+            })
+            attempts += 1
+            time.sleep(1)
+        errors = len(failed_items.keys()) if failed_items else 0
+        return len(chunks.keys()) - errors, errors
 
 
 def dot_rename(path):
     head, fn = os.path.split(path)
     # atomic in most cases
     os.rename(path, os.path.join(head, '.' + fn))
-
-
-def memcache_set(memc, key, value, attempts=1):
-    for _ in range(attempts):
-        status = memc.set(key, value)
-        if status:
-            break
-        time.sleep(1)
 
 
 def parse_appsinstalled(line):
@@ -112,12 +127,14 @@ def file_handler(fn, options):
     thread_pool = {}
     job_pool = {}
     result_queue = Queue()
+    chunks = {}
     for dev_type, memc_addr in device_memc.items():
         memc = memcache.Client([memc_addr])
         job_pool[dev_type] = Queue()
         worker = MemcacheWriter(job_pool[dev_type], result_queue, memc, options.dry,
                                 options.attempts)
         thread_pool[dev_type] = worker
+        chunks[dev_type] = []
         worker.start()
 
     processed = errors = 0
@@ -136,7 +153,17 @@ def file_handler(fn, options):
             errors += 1
             logging.error('Unknown device type: %s' % appsinstalled.dev_type)
             continue
-        job_pool[dev_type].put(appsinstalled)
+
+        chunk = chunks[dev_type]
+        chunk.append(appsinstalled)
+        if len(chunk) == CHUNK_SIZE:
+            job_pool[dev_type].put(chunk)
+            chunk.clear()
+        # job_pool[dev_type].put(appsinstalled)
+
+    for dev_type, chunk in chunks.items():
+        if chunk:
+            job_pool[dev_type].put(chunk)
 
     for q in job_pool.values():
         q.put(SENTINEL)

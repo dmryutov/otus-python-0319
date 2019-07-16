@@ -2,7 +2,7 @@ FROM python:3.7-slim
 
 ENV PYTHONUNBUFFERED=1 PIP_DISABLE_PIP_VERSION_CHECK=on
 
-COPY ./requirements.txt ./scripts/start_prod.sh ./scripts/entrypoint.sh /
+COPY ./requirements.txt ./scripts/* /
 RUN DEPS="libpq-dev" \
     && BUILD_DEPS="build-essential libpcre3-dev" \
     && apt-get update \
