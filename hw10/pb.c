@@ -64,7 +64,7 @@ void example() {
 
 size_t serialize_item(PyObject* item, gzFile output_file) {
     DeviceApps msg = DEVICE_APPS__INIT;
-	DeviceApps__Device device = DEVICE_APPS__DEVICE__INIT;
+    DeviceApps__Device device = DEVICE_APPS__DEVICE__INIT;
 
     // Device
     PyObject* device_raw = PyDict_GetItemString(item, "device");
@@ -176,13 +176,15 @@ static PyObject* deserialize_item(DeviceApps* msg) {
         PyObject* device = PyDict_New();
         // Device ID
         if (msg->device->has_id) {
-            PyDict_SetItemString(device, "id",
-                Py_BuildValue("s#", msg->device->id.data, msg->device->id.len));
+            PyObject* value_py = Py_BuildValue("s#", msg->device->id.data, msg->device->id.len);
+            PyDict_SetItemString(device, "id", value_py);
+            Py_DECREF(value_py);
         }
         // Device type
         if (msg->device->has_type) {
-            PyDict_SetItemString(device, "type",
-                Py_BuildValue("s#", msg->device->type.data, msg->device->type.len));
+            PyObject* value_py = Py_BuildValue("s#", msg->device->type.data, msg->device->type.len);
+            PyDict_SetItemString(device, "type", value_py);
+            Py_DECREF(value_py);
         }
         PyDict_SetItemString(dict, "device", device);
         Py_DECREF(device);
@@ -192,7 +194,9 @@ static PyObject* deserialize_item(DeviceApps* msg) {
     PyObject* apps = PyList_New(0);
     if (msg->n_apps > 0) {
         for (size_t i = 0; i < msg->n_apps; i++) {
-            PyList_Append(apps, Py_BuildValue("i", msg->apps[i]));
+            PyObject* value_py = PyLong_FromLong(msg->apps[i]);
+            PyList_Append(apps, value_py);
+            Py_DECREF(value_py);
         }
     }
     PyDict_SetItemString(dict, "apps", apps);
@@ -200,12 +204,16 @@ static PyObject* deserialize_item(DeviceApps* msg) {
 
     // Lat
     if (msg->has_lat) {
-        PyDict_SetItemString(dict, "lat", Py_BuildValue("d", msg->lat));
+        PyObject* value_py = PyFloat_FromDouble(msg->lat);
+        PyDict_SetItemString(dict, "lat", value_py);
+        Py_DECREF(value_py);
     }
 
     // Lon
     if (msg->has_lat) {
-        PyDict_SetItemString(dict, "lon", Py_BuildValue("d", msg->lon));
+        PyObject* value_py = PyFloat_FromDouble(msg->lon);
+        PyDict_SetItemString(dict, "lon", value_py);
+        Py_DECREF(value_py);
     }
 
     return dict;
@@ -227,15 +235,15 @@ static PyObject* py_deviceapps_xwrite_pb(PyObject* self, PyObject* args) {
     PyObject* iterator = PyObject_GetIter(o);
     if (!iterator) {
         PyErr_SetString(PyExc_TypeError, "First parameter should be Iterable");
-		return NULL;
-	}
+        return NULL;
+    }
 
     // Prepare output file
     gzFile output_file = gzopen(path, "wb");
     if (output_file == NULL) {
         PyErr_SetString(PyExc_OSError, "Error while opening output file");
         Py_DECREF(iterator);
-	    return NULL;
+        return NULL;
     }
 
     // Process items
@@ -280,7 +288,7 @@ static PyObject* py_deviceapps_xread_pb(PyObject* self, PyObject* args) {
     gzFile input_file = gzopen(path, "rb");
     if (input_file == NULL) {
         PyErr_SetString(PyExc_OSError, "Error while opening input file");
-	    return NULL;
+        return NULL;
     }
     
     // Process data
@@ -321,8 +329,10 @@ static PyObject* py_deviceapps_xread_pb(PyObject* self, PyObject* args) {
     if (PyErr_Occurred()) {
         return NULL;
     }
-    // return PySeqIter_New(output_list);
-    return PyObject_CallFunction((PyObject*)&PyGenerator_Type, "(O)", output_list);
+    // PyObject* gen = PySeqIter_New(output_list);
+    PyObject* gen = PyObject_CallFunction((PyObject*)&PyGenerator_Type, "(O)", output_list);
+    Py_DECREF(output_list);
+    return gen;
 }
 
 
@@ -334,7 +344,7 @@ static PyMethodDef PBMethods[] = {
      {NULL, NULL, 0, NULL}
 };
 static PyModuleDef PBModule = {
-	PyModuleDef_HEAD_INIT,
+    PyModuleDef_HEAD_INIT,
     "pb", // Name of module
     "Protobuf (de)serializer", // Module documentation
     -1, // Size of per-interpreter state of module
@@ -342,14 +352,9 @@ static PyModuleDef PBModule = {
 };
 
 
-// Python 2
-// PyMODINIT_FUNC initpb(void) {
-//     (void) Py_InitModule("pb", PBMethods);
-// }
-
 // Python 3
-PyObject* PyInit_pb(void) {
-	PyObject* module = PyModule_Create(&PBModule);
+PyMODINIT_FUNC PyInit_pb(void) {
+    PyObject* module = PyModule_Create(&PBModule);
 
     if (PyType_Ready(&PyGenerator_Type) < 0) {
         return NULL;
