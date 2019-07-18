@@ -1,4 +1,5 @@
 import collections
+from copy import copy
 import glob
 import gzip
 import logging
@@ -43,25 +44,11 @@ class MemcacheWriter(Thread):
                     logging.info('[Worker %s] Stop thread: %s' % (os.getpid(), self.name))
                     break
                 else:
-                    chunks = {
-                        key: value
-                        for key, value in
-                        (self.parse_appsinstalled(appsinstalled) for appsinstalled in chunks)
-                    }
                     proc_items, err_items = self.insert_appsinstalled(chunks)
                     processed += proc_items
                     errors += err_items
             except Empty:
                 continue
-
-    def parse_appsinstalled(self, appsinstalled):
-        ua = appsinstalled_pb2.UserApps()
-        ua.lat = appsinstalled.lat
-        ua.lon = appsinstalled.lon
-        key = '%s:%s' % (appsinstalled.dev_type, appsinstalled.dev_id)
-        ua.apps.extend(appsinstalled.apps)
-        packed = ua.SerializeToString()
-        return (key, packed)
 
     def insert_appsinstalled(self, chunks):
         processed = errors = 0
@@ -77,17 +64,16 @@ class MemcacheWriter(Thread):
         return processed, errors
 
     def memcache_set(self, memc, chunks):
-        failed_items = memc.set_multi(chunks)
+        failed_keys = memc.set_multi(chunks)
         attempts = 0
-        while failed_items and attempts < self.attempts:
-            failed_items = memc.set_multi({
-                key: value
-                for key, value in chunks.items()
-                if key in failed_items
+        while failed_keys and attempts < self.attempts:
+            failed_keys = memc.set_multi({
+                key: chunks[key]
+                for key in failed_keys
             })
             attempts += 1
             time.sleep(1)
-        errors = len(failed_items.keys()) if failed_items else 0
+        errors = len(failed_keys)
         return len(chunks.keys()) - errors, errors
 
 
@@ -116,6 +102,16 @@ def parse_appsinstalled(line):
     return AppsInstalled(dev_type, dev_id, lat, lon, apps)
 
 
+def serialize_appsinstalled(appsinstalled):
+    ua = appsinstalled_pb2.UserApps()
+    ua.lat = appsinstalled.lat
+    ua.lon = appsinstalled.lon
+    key = '%s:%s' % (appsinstalled.dev_type, appsinstalled.dev_id)
+    ua.apps.extend(appsinstalled.apps)
+    packed = ua.SerializeToString()
+    return (key, packed)
+
+
 def file_handler(fn, options):
     device_memc = {
         'idfa': options.idfa,
@@ -134,7 +130,7 @@ def file_handler(fn, options):
         worker = MemcacheWriter(job_pool[dev_type], result_queue, memc, options.dry,
                                 options.attempts)
         thread_pool[dev_type] = worker
-        chunks[dev_type] = []
+        chunks[dev_type] = {}
         worker.start()
 
     processed = errors = 0
@@ -154,12 +150,12 @@ def file_handler(fn, options):
             logging.error('Unknown device type: %s' % appsinstalled.dev_type)
             continue
 
+        key, value = serialize_appsinstalled(appsinstalled)
         chunk = chunks[dev_type]
-        chunk.append(appsinstalled)
-        if len(chunk) == CHUNK_SIZE:
-            job_pool[dev_type].put(chunk)
+        chunk[key] = value
+        if len(chunk.keys()) == CHUNK_SIZE:
+            job_pool[dev_type].put(copy(chunk))
             chunk.clear()
-        # job_pool[dev_type].put(appsinstalled)
 
     for dev_type, chunk in chunks.items():
         if chunk:
