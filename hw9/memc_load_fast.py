@@ -1,5 +1,4 @@
 import collections
-from copy import copy
 import glob
 import gzip
 import logging
@@ -154,8 +153,8 @@ def file_handler(fn, options):
         chunk = chunks[dev_type]
         chunk[key] = value
         if len(chunk.keys()) == CHUNK_SIZE:
-            job_pool[dev_type].put(copy(chunk))
-            chunk.clear()
+            job_pool[dev_type].put(chunk)
+            chunks[dev_type] = {}
 
     for dev_type, chunk in chunks.items():
         if chunk:
