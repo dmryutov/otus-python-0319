@@ -1,2 +1,2 @@
-aiohttp
-lxml
+aiohttp==3.5.4
+lxml==4.3.3

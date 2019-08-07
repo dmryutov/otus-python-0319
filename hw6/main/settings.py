@@ -180,10 +180,10 @@ CORS_ALLOW_HEADERS = [
     'x-requested-with',
 ]
 CORS_ORIGIN_WHITELIST = (
-    'localhost:8000',
-    '127.0.0.1:8000',
-    'localhost:8080',
-    '127.0.0.1:8080',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://localhost:8080',
+    'http://127.0.0.1:8080',
 )
 
 REST_FRAMEWORK = {

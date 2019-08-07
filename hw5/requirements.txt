@@ -1,2 +1,2 @@
-requests
-uwsgi
+requests==2.22.0
+uwsgi==2.0.18

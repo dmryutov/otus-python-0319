@@ -22,46 +22,6 @@ typedef struct pbheader_s {
 const size_t ERROR_CODE = -1;
 
 
-// https://github.com/protobuf-c/protobuf-c/wiki/Examples
-void example() {
-    DeviceApps msg = DEVICE_APPS__INIT;
-    DeviceApps__Device device = DEVICE_APPS__DEVICE__INIT;
-    void* buf;
-    size_t len;
-
-    char* device_id = "e7e1a50c0ec2747ca56cd9e1558c0d7c";
-    char* device_type = "idfa";
-    device.has_id = 1;
-    device.id.data = (uint8_t*)device_id;
-    device.id.len = strlen(device_id);
-    device.has_type = 1;
-    device.type.data = (uint8_t*)device_type;
-    device.type.len = strlen(device_type);
-    msg.device = &device;
-
-    msg.has_lat = 1;
-    msg.lat = 67.7835424444;
-    msg.has_lon = 1;
-    msg.lon = -22.8044005471;
-
-    msg.n_apps = 3;
-    msg.apps = malloc(sizeof(uint32_t) * msg.n_apps);
-    msg.apps[0] = 42;
-    msg.apps[1] = 43;
-    msg.apps[2] = 44;
-    len = device_apps__get_packed_size(&msg);
-
-    buf = malloc(len);
-    device_apps__pack(&msg, buf);
-
-    fprintf(stderr, "Writing %lu serialized bytes\n", len); // See the length of message
-    fwrite(buf, len, 1, stdout); // Write to stdout to allow direct command line piping
-
-    free(msg.apps);
-    free(buf);
-}
-
-
 size_t serialize_item(PyObject* item, gzFile output_file) {
     DeviceApps msg = DEVICE_APPS__INIT;
     DeviceApps__Device device = DEVICE_APPS__DEVICE__INIT;
@@ -134,6 +94,10 @@ size_t serialize_item(PyObject* item, gzFile output_file) {
         size_t n_apps = (size_t)PySequence_Size(apps_raw);
         msg.n_apps = n_apps;
         msg.apps = malloc(sizeof(size_t) * msg.n_apps);
+        if (!msg.apps) {
+            PyErr_SetString(PyExc_MemoryError, "Error while allocating memory");
+            return ERROR_CODE;
+        }
 
         for (size_t i = 0; i < n_apps; i++) {
             PyObject* app = PyList_GET_ITEM(apps_raw, i);
@@ -151,6 +115,10 @@ size_t serialize_item(PyObject* item, gzFile output_file) {
     // Finalize data
     size_t len = device_apps__get_packed_size(&msg);
     void* buf = malloc(len);
+    if (!buf) {
+        PyErr_SetString(PyExc_MemoryError, "Error while allocating memory");
+        return ERROR_CODE;
+    }
     device_apps__pack(&msg, buf);
     pbheader_t pbheader = PBHEADER_INIT;
     pbheader.type = DEVICE_APPS_TYPE;
@@ -170,6 +138,10 @@ size_t serialize_item(PyObject* item, gzFile output_file) {
 
 static PyObject* deserialize_item(DeviceApps* msg) {
     PyObject* dict = PyDict_New();
+    if (!dict) {
+        PyErr_SetString(PyExc_MemoryError, "Error while constructing Python value");
+        goto error;
+    }
 
     // Device
     if (msg->device) {
@@ -177,6 +149,10 @@ static PyObject* deserialize_item(DeviceApps* msg) {
         // Device ID
         if (msg->device->has_id) {
             PyObject* value_py = Py_BuildValue("s#", msg->device->id.data, msg->device->id.len);
+            if (!value_py) {
+                PyErr_SetString(PyExc_MemoryError, "Error while constructing Python value");
+                goto error;
+            }
             PyDict_SetItemString(device, "id", value_py);
             Py_DECREF(value_py);
         }
@@ -184,7 +160,10 @@ static PyObject* deserialize_item(DeviceApps* msg) {
         if (msg->device->has_type) {
             PyObject* value_py = Py_BuildValue("s#", msg->device->type.data, msg->device->type.len);
             PyDict_SetItemString(device, "type", value_py);
-            Py_DECREF(value_py);
+            if (!value_py) {
+                PyErr_SetString(PyExc_MemoryError, "Error while constructing Python value");
+                goto error;
+            }
         }
         PyDict_SetItemString(dict, "device", device);
         Py_DECREF(device);
@@ -195,6 +174,10 @@ static PyObject* deserialize_item(DeviceApps* msg) {
     if (msg->n_apps > 0) {
         for (size_t i = 0; i < msg->n_apps; i++) {
             PyObject* value_py = PyLong_FromLong(msg->apps[i]);
+            if (!value_py) {
+                PyErr_SetString(PyExc_MemoryError, "Error while constructing Python value");
+                goto error;
+            }
             PyList_Append(apps, value_py);
             Py_DECREF(value_py);
         }
@@ -205,6 +188,10 @@ static PyObject* deserialize_item(DeviceApps* msg) {
     // Lat
     if (msg->has_lat) {
         PyObject* value_py = PyFloat_FromDouble(msg->lat);
+        if (!value_py) {
+            PyErr_SetString(PyExc_MemoryError, "Error while constructing Python value");
+            goto error;
+        }
         PyDict_SetItemString(dict, "lat", value_py);
         Py_DECREF(value_py);
     }
@@ -212,11 +199,19 @@ static PyObject* deserialize_item(DeviceApps* msg) {
     // Lon
     if (msg->has_lat) {
         PyObject* value_py = PyFloat_FromDouble(msg->lon);
+        if (!value_py) {
+            PyErr_SetString(PyExc_MemoryError, "Error while constructing Python value");
+            goto error;
+        }
         PyDict_SetItemString(dict, "lon", value_py);
         Py_DECREF(value_py);
     }
 
     return dict;
+
+error:
+    Py_XDECREF(dict);
+    return NULL;
 }
 
 
@@ -301,6 +296,10 @@ static PyObject* py_deviceapps_xread_pb(PyObject* self, PyObject* args) {
         if (bytes > 0) {
             // Read body
             void* buf = malloc(pbheader.length);
+            if (!buf) {
+                PyErr_SetString(PyExc_MemoryError, "Error while allocating memory");
+                goto free_res;
+            }
             bytes = gzread(input_file, buf, pbheader.length);
 
             // Parse message
@@ -324,6 +323,7 @@ static PyObject* py_deviceapps_xread_pb(PyObject* self, PyObject* args) {
     }
     
     // Free acquired resources
+free_res:
     gzclose(input_file);
 
     if (PyErr_Occurred()) {

@@ -1,2 +1,2 @@
-fakeredis
-redis
+fakeredis==1.0.3
+redis==3.2.1

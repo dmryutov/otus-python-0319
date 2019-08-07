@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 from collections import namedtuple
+from concurrent.futures import ThreadPoolExecutor
 import logging
 from mimetypes import guess_extension
 import pathlib
@@ -68,6 +69,19 @@ def setup_logger(debug):
                         datefmt='%Y-%m-%d %H:%M:%S')
 
 
+def write_file(path, is_binary, content):
+    """
+    Write synchronously to file
+
+    Args:
+        path (str): File path
+        is_binary (bool): True if should write binary content (e.g. images)
+        content (str|byte): File content
+    """
+    with open(path, 'wb' if is_binary else 'w') as f:
+        f.write(content)
+
+
 async def fetch(url, is_binary=False):
     """
     Fetch URL and guess response extension
@@ -115,8 +129,10 @@ async def download_page(url, file_dir, file_name, is_binary=False):
     response = await fetch(url, is_binary)
     path = file_dir.joinpath('{}{}'.format(file_name, response.ext))
     try:
-        with open(str(path), 'wb' if is_binary else 'w') as f:
-            f.write(response.content)
+        with ThreadPoolExecutor() as pool:
+            await asyncio.get_running_loop().run_in_executor(
+                pool, write_file, str(path), is_binary, response.content
+            )
     except OSError:
         logging.error('Can\'t save file: {}'.format(path))
     return response
@@ -257,9 +273,7 @@ if __name__ == '__main__':
     result_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # asyncio.run(monitor_main(result_dir, args.interval))
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(monitor_main(result_dir, args.interval))
+        asyncio.run(monitor_main(result_dir, args.interval))
     except asyncio.CancelledError:
         logging.info('Crawler canceled')
     except KeyboardInterrupt:
