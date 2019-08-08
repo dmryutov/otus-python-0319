@@ -118,7 +118,7 @@ Prepare:
 yum clean all
 yum install -y git make
 git clone https://github.com/dmryutov/otus-python-0319.git projects/otus
-cd projects/otus/hw6
+cd projects/otus/hw06
 ```
 
 Build project:

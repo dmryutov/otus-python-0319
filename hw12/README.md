@@ -2,7 +2,7 @@
 
 ## MemcLoad v2
 
-Go version of [memc_load.py](../hw9/memc_load.py) and [memc_load_fast.py](../hw9/memc_load_fast.py) from HW 9.
+Go version of [memc_load.py](../hw09/memc_load.py) and [memc_load_fast.py](../hw09/memc_load_fast.py) from HW 9.
 
 
 

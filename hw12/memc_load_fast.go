@@ -9,10 +9,10 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
@@ -32,13 +32,13 @@ type AppsInstalled struct {
 	apps    []uint32
 }
 type Options struct {
+	logFile  string
 	dry      bool
 	pattern  string
 	idfa     string
 	gaid     string
 	adid     string
 	dvid     string
-	workers  int
 	attempts int
 	buffer   int
 }
@@ -51,10 +51,27 @@ type Result struct {
 	errors    int
 }
 
-func memcacheWriter(jobQueue <-chan *AppsInstalled, resultQueue chan<- Result, memc *MemcacheClient,
+
+func createMemcacheClients(options *Options) map[string]MemcacheClient {
+	deviceMemc := map[string]string{
+		"idfa": options.idfa,
+		"gaid": options.gaid,
+		"adid": options.adid,
+		"dvid": options.dvid,
+	}
+	clients := make(map[string]MemcacheClient)
+	for devType, memcAddr := range deviceMemc {
+		clients[devType] = MemcacheClient{memcAddr, memcache.New(memcAddr)}
+		clients[devType].client.Timeout = MEMCACHE_TIMEOUT
+	}
+	return clients
+}
+
+
+func memcacheWriter(memcCh <-chan *AppsInstalled, resultCh chan<- Result, memc *MemcacheClient,
 	dryRun bool, attempts int) {
 	processed, errors := 0, 0
-	for ai := range jobQueue {
+	for ai := range memcCh {
 		ok := insertAppsinstalled(memc, ai, dryRun, attempts)
 		if ok {
 			processed += 1
@@ -62,9 +79,10 @@ func memcacheWriter(jobQueue <-chan *AppsInstalled, resultQueue chan<- Result, m
 			errors += 1
 		}
 	}
-	resultQueue <- Result{processed, errors}
+	resultCh <- Result{processed, errors}
 	processed, errors = 0, 0
 }
+
 
 func memcacheSet(memc *memcache.Client, key string, value []byte, attempts int) bool {
 	for i := 0; i < attempts; i++ {
@@ -80,14 +98,6 @@ func memcacheSet(memc *memcache.Client, key string, value []byte, attempts int) 
 	return true
 }
 
-func dotRename(path string) {
-	head, fn := filepath.Split(path)
-
-	err := os.Rename(path, filepath.Join(head, "."+fn))
-	if err != nil {
-		log.Fatalf("Error while renaming file: %v", path)
-	}
-}
 
 func insertAppsinstalled(memc *MemcacheClient, ai *AppsInstalled, dryRun bool, attempts int) bool {
 	ua := &appsinstalled.UserApps{
@@ -114,6 +124,7 @@ func insertAppsinstalled(memc *MemcacheClient, ai *AppsInstalled, dryRun bool, a
 
 	return true
 }
+
 
 func parseAppsinstalled(line string) (AppsInstalled, error) {
 	var ai AppsInstalled
@@ -159,150 +170,151 @@ func parseAppsinstalled(line string) (AppsInstalled, error) {
 	return ai, nil
 }
 
-func fileHandler(fileJobQueue <-chan string, fileResultQueue chan<- string, options *Options) {
-	deviceMemc := map[string]string{
-		"idfa": options.idfa,
-		"gaid": options.gaid,
-		"adid": options.adid,
-		"dvid": options.dvid,
+
+func fileHandler(fn string, options *Options, clients map[string]MemcacheClient) bool {
+	processed, errors := 0, 0
+	log.Printf("Processing %v", fn)
+
+	// Create channels
+	resultCh := make(chan Result)
+	memcCh := make(map[string]chan *AppsInstalled)
+	for devType, memc := range clients {
+		memcCh[devType] = make(chan *AppsInstalled, options.buffer)
+		go memcacheWriter(memcCh[devType], resultCh, &memc, options.dry, options.attempts)
 	}
 
-	resultQueue := make(chan Result)
-	defer close(resultQueue)
+	// Read archive
+	file, err := os.Open(fn)
+	if err != nil {
+		log.Fatalf("Error while reading file: %v", err)
+		return false
+	}
+	defer file.Close()
+	gz, err := gzip.NewReader(file)
+	if err != nil {
+		log.Printf("Error while reading archive %v", err)
+		return false
+	}
+	defer gz.Close()
 
-	jobPool := make(map[string]chan *AppsInstalled)
-	for devType, memcAddr := range deviceMemc {
-		jobPool[devType] = make(chan *AppsInstalled, options.buffer)
-		memc := MemcacheClient{memcAddr, memcache.New(memcAddr)}
-		memc.client.Timeout = MEMCACHE_TIMEOUT
-		go memcacheWriter(jobPool[devType], resultQueue, &memc, options.dry, options.attempts)
-		defer close(jobPool[devType])
+	// Parse lines
+	scanner := bufio.NewScanner(gz)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+		if line == "" {
+			continue
+		}
+
+		ai, err := parseAppsinstalled(line)
+		if err != nil {
+			errors += 1
+			continue
+		}
+
+		devType := ai.devType
+		_, found := clients[devType]
+		if !found {
+			errors += 1
+			log.Fatalf("Unknown device type: %v", devType)
+			continue
+		}
+
+		memcCh[devType] <- &ai
 	}
 
-	for fn := range fileJobQueue {
-		processed, errors := 0, 0
-		log.Printf("Processing %v", fn)
+	// Close channels
+	for devType := range clients {
+		close(memcCh[devType])
+	}
+	for _ = range clients {
+		result := <-resultCh
+		processed += result.processed
+		errors += result.errors
+	}
+	close(resultCh)
 
-		file, err := os.Open(fn)
-		if err != nil {
-			log.Fatalf("Error while reading file: %v", err)
-			fileResultQueue <- fn
-			continue
+	// Calculate error rate
+	errRate := 1.0
+	if processed == 0 {
+		if errors == 0 {
+			errRate = 0
 		}
-		defer file.Close()
-		gz, err := gzip.NewReader(file)
-		if err != nil {
-			log.Printf("Error while reading archive %v", err)
-			fileResultQueue <- fn
-			continue
-		}
-		defer gz.Close()
+	} else {
+		errRate = float64(errors) / float64(processed)
+	}
 
-		scanner := bufio.NewScanner(gz)
-		for scanner.Scan() {
-			line := strings.TrimSpace(scanner.Text())
-			if line == "" {
-				continue
-			}
-
-			ai, err := parseAppsinstalled(line)
-			if err != nil {
-				errors += 1
-				continue
-			}
-
-			devType := ai.devType
-			_, found := deviceMemc[devType]
-			if !found {
-				errors += 1
-				log.Fatalf("Unknown device type: %v", devType)
-				continue
-			}
-
-			jobPool[devType] <- &ai
-		}
-
-		// Close channels
-		for devType := range deviceMemc {
-			close(jobPool[devType])
-		}
-		for _ = range deviceMemc {
-			result := <-resultQueue
-			processed += result.processed
-			errors += result.errors
-		}
-
-		if processed == 0 {
-			fileResultQueue <- fn
-			continue
-		}
-
-		errRate := float64(errors) / float64(processed)
-		if errRate < NORMAL_ERR_RATE {
-			log.Printf("Acceptable error rate (%v). Successfull load", errRate)
-		} else {
-			log.Fatalf("High error rate (%v > %v). Failed load", errRate, NORMAL_ERR_RATE)
-		}
-
-		fileResultQueue <- fn
+	if errRate < NORMAL_ERR_RATE {
+		log.Printf("Acceptable error rate (%v). Successfull load", errRate)
+		return true
+	} else {
+		log.Fatalf("High error rate (%v > %v). Failed load", errRate, NORMAL_ERR_RATE)
+		return false
 	}
 }
 
-func processFiles(options *Options) {
+
+func dotRename(path string) {
+	head, fn := filepath.Split(path)
+
+	err := os.Rename(path, filepath.Join(head, "." + fn))
+	if err != nil {
+		log.Fatalf("Error while renaming file: %v", path)
+	}
+}
+
+
+func processFiles(options *Options, clients map[string]MemcacheClient) {
 	files, err := filepath.Glob(options.pattern)
 	if err != nil {
 		log.Fatalf("No files for pattern `%v`", options.pattern)
 		return
 	}
 
-	fileResultQueue := make(chan string, options.buffer)
-	defer close(fileResultQueue)
-	fileJobQueue := make(chan string, options.buffer)
-	defer close(fileJobQueue)
-	for i := 0; i < options.workers; i++ {
-		go fileHandler(fileJobQueue, fileResultQueue, options)
-	}
-
 	sort.Strings(files)
-	for _, fn := range files {
-		fileJobQueue <- fn
+	var wg sync.WaitGroup
+	for _, fname := range files {
+		wg.Add(1)
+		go func(fn string) {
+			ok := fileHandler(fn, options, clients)
+			if ok {
+				dotRename(fn)
+			}
+			wg.Done()
+		}(fname)
 	}
-	for _ = range files {
-		fn := <-fileResultQueue
-		dotRename(fn)
-	}
+	wg.Wait()	
 }
+
 
 func main() {
 	// Parse arguments
-	logFile := *flag.String("log", "", "")
-	dry := *flag.Bool("dry", false, "")
-	pattern := *flag.String("pattern", "/data/appsinstalled/*.tsv.gz", "")
-	idfa := *flag.String("idfa", "127.0.0.1:33013", "")
-	gaid := *flag.String("gaid", "127.0.0.1:33014", "")
-	adid := *flag.String("adid", "127.0.0.1:33015", "")
-	dvid := *flag.String("dvid", "127.0.0.1:33016", "")
-	workers := *flag.Int("workers", runtime.NumCPU()+1, "")
-	attempts := *flag.Int("attempts", 3, "")
-	buffer := *flag.Int("buffer", 100, "")
+	logFile := flag.String("log", "", "")
+	dry := flag.Bool("dry", false, "")
+	pattern := flag.String("pattern", "/data/appsinstalled/*.tsv.gz", "")
+	idfa := flag.String("idfa", "127.0.0.1:33013", "")
+	gaid := flag.String("gaid", "127.0.0.1:33014", "")
+	adid := flag.String("adid", "127.0.0.1:33015", "")
+	dvid := flag.String("dvid", "127.0.0.1:33016", "")
+	attempts := flag.Int("attempts", 3, "")
+	buffer := flag.Int("buffer", 100, "")
 	flag.Parse()
 
 	options := &Options{
-		dry:      dry,
-		pattern:  pattern,
-		idfa:     idfa,
-		gaid:     gaid,
-		adid:     adid,
-		dvid:     dvid,
-		workers:  workers,
-		attempts: attempts,
-		buffer:   buffer,
+		logFile:  *logFile,
+		dry:      *dry,
+		pattern:  *pattern,
+		idfa:     *idfa,
+		gaid:     *gaid,
+		adid:     *adid,
+		dvid:     *dvid,
+		attempts: *attempts,
+		buffer:   *buffer,
 	}
 
-	if logFile != "" {
-		f, err := os.OpenFile(logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
+	if options.logFile != "" {
+		f, err := os.OpenFile(options.logFile, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 		if err != nil {
-			log.Fatalf("Error while openning log file: %s", logFile)
+			log.Fatalf("Error while openning log file: %s", options.logFile)
 			return
 		}
 		defer f.Close()
@@ -310,5 +322,6 @@ func main() {
 	}
 
 	log.Printf("Memc loader started")
-	processFiles(options)
+	clients := createMemcacheClients(options)
+	processFiles(options, clients)
 }
