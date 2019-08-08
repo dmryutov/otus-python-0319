@@ -106,9 +106,6 @@ Usage of memc_load_fast:
   -pattern string
          (default "/data/appsinstalled/*.tsv.gz")
   -test
-    
-  -workers int
-         (default 5)
 ```
 
 Run in Docker:
